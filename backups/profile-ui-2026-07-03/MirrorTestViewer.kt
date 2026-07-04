@@ -86,24 +86,20 @@ internal fun GalleryViewerPager(
     // Note editing: one live buffer tracked by which file it belongs to, so it survives swipes and
     // commits the previous photo's edit before loading the next.
     var editingFile by remember { mutableStateOf(current.fileName) }
-    // Local echoes so an edit reflects instantly without waiting on a VM reload — a committed note
-    // stays authoritative over the (possibly stale) `photos` snapshot when you page back to it.
-    val noteOverride = remember { mutableStateMapOf<String, String>() }
+    var noteInput by remember { mutableStateOf(current.note) }
+    // Local album echo so the chip highlight updates instantly without waiting on a VM reload.
     val albumOverride = remember { mutableStateMapOf<String, String>() }
-    var noteInput by remember { mutableStateOf(noteOverride[current.fileName] ?: current.note) }
     val currentAlbum = albumOverride[current.fileName] ?: current.album
 
     fun commitNote() {
         val original = photos.firstOrNull { it.fileName == editingFile } ?: return
-        val trimmed = noteInput.trim()
-        noteOverride[editingFile] = trimmed
-        if (trimmed != original.note) onSaveNote(original, trimmed)
+        if (noteInput.trim() != original.note) onSaveNote(original, noteInput.trim())
     }
     LaunchedEffect(pagerState.currentPage) {
         if (current.fileName != editingFile) {
             commitNote()
             editingFile = current.fileName
-            noteInput = noteOverride[current.fileName] ?: current.note
+            noteInput = current.note
         }
     }
 
@@ -240,5 +236,5 @@ private fun decodeFittedBitmap(file: File, reqPx: Int): Bitmap? {
     }
     return runCatching {
         Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, Matrix().apply { postRotate(degrees) }, true)
-    }.getOrDefault(decoded).also { if (it !== decoded) decoded.recycle() }
+    }.getOrDefault(decoded)
 }

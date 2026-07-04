@@ -1,5 +1,7 @@
 package com.forge.app.ui.profile.state
 
+import com.forge.app.data.repo.ExtendedGoalRepository
+import com.forge.app.data.repo.GoalRepository
 import com.forge.app.data.repo.ProgressPhoto
 import com.forge.app.data.repo.SignatureLift
 import com.forge.app.data.repo.TrophyCell
@@ -45,6 +47,11 @@ data class ProfileUiState(
     val mostLoggedDay: String? = null,
     val usualHour: String? = null,
 
+    // Goals (all set goals, achieved-first then closest-first; the Profile previews the top few)
+    val goals: List<GoalRepository.GoalProgress> = emptyList(),
+    // Custom goals (cardio / sessions / volume / bodyweight, auto-tracked) — previewed in the same box.
+    val customGoals: List<ExtendedGoalRepository.Progress> = emptyList(),
+
     // The mirror test (progress photos)
     val photos: List<ProgressPhoto> = emptyList(),
 
@@ -64,8 +71,5 @@ data class ProfileUiState(
     // All-time cardio totals
     val cardioSessions: Int = 0,
     val cardioMinutes: Int = 0,
-    val cardioDistanceKm: Double = 0.0,
-
-    // Cumulative lifted volume (lb), one point per finished session, oldest → newest — the All-Time graph.
-    val lifetimeVolumeSeriesLb: List<Double> = emptyList()
+    val cardioDistanceKm: Double = 0.0
 )
