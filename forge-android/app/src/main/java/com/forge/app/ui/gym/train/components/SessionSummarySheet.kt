@@ -1,17 +1,16 @@
 package com.forge.app.ui.gym.train.components
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
@@ -23,32 +22,35 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.forge.app.domain.mood.Mood
 import com.forge.app.domain.notify.PrMilestone
-import com.forge.app.domain.units.formatVolume
+import com.forge.app.domain.units.formatVolumeCompact
+import com.forge.app.domain.units.unitLabel
 import com.forge.app.service.ForgeNotifications
 import com.forge.app.ui.common.ConfettiOverlay
-import com.forge.app.ui.common.bounceClick
+import com.forge.app.ui.common.EditorialCountUpFigure
+import com.forge.app.ui.common.EditorialFigure
+import com.forge.app.ui.common.EditorialHeader
+import com.forge.app.ui.common.ForgeHeroAction
 import com.forge.app.ui.gym.stats.components.BodyHeatmap
 import com.forge.app.ui.common.statsEntrance
 import com.forge.app.ui.theme.LocalForgeSettings
 import com.forge.app.ui.gym.train.state.SessionSummary
 
 /**
- * The end-of-session summary. Stripped to five reads: any new PRs (hidden when none), the general
- * stats + time, a recap of what you worked (muscle map + exercise list), and the coach's corner —
- * what he saw and the effort data he'd like more of. [onDismiss] keeps its tags/mood params for the
- * shared event signature, but both are now always empty; the mid-session journal flows straight
- * through so it's still persisted on COMPLETE.
+ * The end-of-session summary, drawn as the **Modal** archetype (DESIGN §3): the sheet keeps its
+ * `surface` fill, its content sits on the 24dp gutter, and its one action lands at the END.
+ *
+ * Four reads, in order: any new PRs, the session's own figures, a recap of what you worked (muscle
+ * map + exercise list), and the coach's corner — what he saw and the effort data he'd like more of.
+ * Sections separate by air and a mono anchor, never a hairline (§1). [onDismiss] keeps its
+ * tags/mood params for the shared event signature, but both are now always empty; the mid-session
+ * journal flows straight through so it's still persisted on complete.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,19 +58,13 @@ fun SessionSummarySheet(
     summary: SessionSummary,
     onDismiss: (mood: Mood?, tags: List<String>, journal: String) -> Unit
 ) {
-    // Block swipe-to-dismiss: the only way out is the COMPLETE button, otherwise the sheet can be
+    // Block swipe-to-dismiss: the only way out is the Complete button, otherwise the sheet can be
     // swiped away while the summary is still "open", leaving FINISH dead.
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden }
     )
 
-    val onBg = MaterialTheme.colorScheme.onBackground
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val outline = MaterialTheme.colorScheme.outline
-    val bg = MaterialTheme.colorScheme.background
-    val accent = MaterialTheme.colorScheme.primary
-    val weightUnit = LocalForgeSettings.current.weightUnit
     val context = LocalContext.current
     val hapticStrength = LocalForgeSettings.current.hapticStrength
 
@@ -99,115 +95,11 @@ fun SessionSummarySheet(
     ModalBottomSheet(
         onDismissRequest = {},
         sheetState = sheetState,
-        containerColor = bg
+        // §5 — a modal is the one place a fill is not earned by interactivity, and it says `surface`.
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Box {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Header
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        summary.dayWord.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 1.5.sp,
-                        color = muted,
-                        fontSize = 9.sp
-                    )
-                    Text(
-                        summary.displayName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = onBg
-                    )
-                    Text(
-                        "workout complete",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = muted,
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic
-                    )
-                }
-
-                // New PRs — the celebration headline. Hidden entirely when there are none.
-                if (hasPr) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        CountUpStat(
-                            value = summary.prCount.toDouble(),
-                            label = if (summary.prCount == 1) "NEW PR" else "NEW PRs",
-                            onBg = onBg,
-                            muted = muted
-                        ) { it.toInt().toString() }
-                    }
-                }
-
-                // General stats + time taken.
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    CountUpStat(value = summary.totalVolumeLb, label = "VOLUME", onBg = onBg, muted = muted) { formatVolume(it, weightUnit) }
-                    FlatStat(value = "${summary.durationMinutes} min", label = "TIME", onBg = onBg, muted = muted)
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    FlatStat(value = "${summary.setCount}", label = "SETS", onBg = onBg, muted = muted)
-                    FlatStat(
-                        value = "${summary.exercisesLogged}" + (if (summary.exercisesSkipped > 0) " · ${summary.exercisesSkipped} skipped" else ""),
-                        label = "EXERCISES",
-                        onBg = onBg,
-                        muted = muted
-                    )
-                }
-
-                // Recap — what you worked on: the muscle map + the exercise list.
-                if (summary.setsByMuscle.isNotEmpty() || summary.highlights.isNotEmpty()) {
-                    HorizontalDivider(color = outline.copy(alpha = 0.2f))
-                    Text("WHAT YOU WORKED", style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
-                    if (summary.setsByMuscle.isNotEmpty()) {
-                        BodyHeatmap(
-                            setsByMuscle = summary.setsByMuscle,
-                            accent = accent,
-                            faint = outline.copy(alpha = 0.34f),
-                            silhouette = outline.copy(alpha = 0.26f),
-                            labelColor = muted,
-                            modifier = Modifier.fillMaxWidth().statsEntrance(0)
-                        )
-                    }
-                    summary.highlights.forEach { h -> HighlightRow(h, onBg = onBg, muted = muted) }
-                }
-
-                // Coach — what he read from this session, and the effort data he'd like more of.
-                CoachReadSection(
-                    coachOpinion = summary.coachOpinion,
-                    setsWithRpe = summary.setsWithRpe,
-                    totalSets = summary.setCount,
-                    exercisesRated = summary.exercisesRated,
-                    exercisesLogged = summary.exercisesLogged,
-                    onBg = onBg,
-                    muted = muted,
-                    outline = outline
-                )
-
-                // Complete button — only way to dismiss. Tags/mood are gone; the mid-session journal
-                // flows straight through so it's still persisted on finish.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 16.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .border(0.5.dp, outline.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                        .bounceClick { onDismiss(null, emptyList(), summary.initialJournal) }
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "COMPLETE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = onBg,
-                        letterSpacing = 1.5.sp
-                    )
-                }
-            }
+            SessionSummaryContent(summary) { onDismiss(null, emptyList(), summary.initialJournal) }
 
             // PR confetti: fires once when the sheet opens on a session with a new PR.
             if (showConfetti) {
@@ -217,5 +109,147 @@ fun SessionSummarySheet(
                 )
             }
         }
+    }
+}
+
+/**
+ * The sheet's body, split out the way `ModalRecipe` splits its own: the sheet chrome adds nothing
+ * you need to design, and on its own the content previews and screenshots without a dialog window.
+ */
+@Composable
+internal fun SessionSummaryContent(summary: SessionSummary, onComplete: () -> Unit) {
+    val onBg = MaterialTheme.colorScheme.onBackground
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val outline = MaterialTheme.colorScheme.outline
+    val accent = MaterialTheme.colorScheme.primary
+    val weightUnit = LocalForgeSettings.current.weightUnit
+    val hasPr = summary.prCount > 0
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(top = 8.dp, bottom = 24.dp)
+    ) {
+        // Header — mono eyebrow over the serif day name, the §3 modal opening. No "workout
+        // complete" line under it: the confetti, the figures and the Complete button
+        // already say so, and §4.3 cuts mechanics narration rather than trimming it.
+        Text(
+            summary.dayWord.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = muted
+        )
+        Spacer(Modifier.height(8.dp))
+        // §11 — a serif title takes no terminal period.
+        Text(
+            summary.displayName,
+            style = MaterialTheme.typography.headlineSmall,
+            color = onBg
+        )
+
+        // New PRs — the peak of the session, alone on its line so the isolation carries the
+        // emphasis without spending a second serif size on it. Hidden at zero: unlike the
+        // readings below, a PR count of 0 is not an honest zero, it is a result that
+        // didn't happen, and the gold star on each PR row is where the detail lives.
+        if (hasPr) {
+            Spacer(Modifier.height(24.dp))
+            EditorialCountUpFigure(
+                value = summary.prCount.toDouble(),
+                label = if (summary.prCount == 1) "new PR" else "new PRs",
+                onBg = onBg,
+                muted = muted,
+                modifier = Modifier.statsEntrance(0)
+            )
+        }
+
+        // The four readings the session is judged on. Honest zeros, and they wrap rather
+        // than clip at 200% font scale (§14) because each figure owns half the row.
+        Spacer(Modifier.height(24.dp))
+        Row(
+            Modifier.fillMaxWidth().statsEntrance(1),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            EditorialCountUpFigure(
+                value = summary.totalVolumeLb,
+                // The unit rides in the mono caption, not in the serif figure — a figure
+                // clamps to one line, and "12.3k kg" is what clips first at large scales.
+                label = "volume · ${unitLabel(weightUnit)}",
+                onBg = onBg,
+                muted = muted,
+                modifier = Modifier.weight(1f)
+            ) { formatVolumeCompact(it, weightUnit, withUnit = false) }
+            EditorialFigure(
+                value = "${summary.durationMinutes}",
+                label = "minutes",
+                onBg = onBg, muted = muted, accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(
+            Modifier.fillMaxWidth().statsEntrance(2),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            EditorialFigure(
+                value = "${summary.setCount}",
+                label = "sets",
+                onBg = onBg, muted = muted, accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+            EditorialFigure(
+                value = "${summary.exercisesLogged}",
+                // Skipped lifts qualify the figure from its caption rather than crowding
+                // the number — the figure states what you actually logged.
+                label = if (summary.exercisesSkipped > 0) {
+                    "exercises · ${summary.exercisesSkipped} skipped"
+                } else {
+                    "exercises"
+                },
+                onBg = onBg, muted = muted, accent = accent,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // Recap — what you worked on: the muscle map + the exercise list.
+        if (summary.setsByMuscle.isNotEmpty() || summary.highlights.isNotEmpty()) {
+            Spacer(Modifier.height(28.dp))
+            EditorialHeader(label = "What you worked", muted = muted, accent = accent)
+            Spacer(Modifier.height(10.dp))
+            if (summary.setsByMuscle.isNotEmpty()) {
+                BodyHeatmap(
+                    setsByMuscle = summary.setsByMuscle,
+                    accent = accent,
+                    faint = outline.copy(alpha = 0.34f),
+                    silhouette = outline.copy(alpha = 0.26f),
+                    labelColor = muted,
+                    modifier = Modifier.fillMaxWidth().statsEntrance(3)
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+            summary.highlights.forEach { h -> HighlightRow(h, onBg = onBg, muted = muted) }
+        }
+
+        // Coach — what he read from this session, and the effort data he'd like more of.
+        CoachReadSection(
+            coachOpinion = summary.coachOpinion,
+            setsWithRpe = summary.setsWithRpe,
+            totalSets = summary.setCount,
+            exercisesRated = summary.exercisesRated,
+            exercisesLogged = summary.exercisesLogged,
+            onBg = onBg,
+            muted = muted,
+            accent = accent
+        )
+
+        // The single exit from a finishing moment, so it takes the accent-filled hero rather than
+        // the light ① capsule (§8, 2026-08-24) — `onPrimary` flips with the accent's luminance, so
+        // the label holds on a pale Gold as well as on a monochrome neutral.
+        Spacer(Modifier.height(28.dp))
+        ForgeHeroAction(
+            text = "Complete",
+            onClick = onComplete,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

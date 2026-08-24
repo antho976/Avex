@@ -108,8 +108,42 @@ fun EditorialFigure(
             }
         }
         Spacer(Modifier.height(2.dp))
-        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp)
+        FigureLabel(label, muted)
     }
+}
+
+/**
+ * [EditorialFigure] whose number rolls up from zero the first time it appears — for a figure that
+ * lands as a RESULT (the end-of-session readings), never for a resting dashboard total. Same
+ * formula, so it sits in a figure row beside plain ones with no seam; [CountUpText] settles on the
+ * final value instantly under reduced motion, so nothing is gated on the roll.
+ */
+@Composable
+fun EditorialCountUpFigure(
+    value: Double,
+    label: String,
+    onBg: Color,
+    muted: Color,
+    modifier: Modifier = Modifier,
+    format: (Double) -> String = { it.toInt().toString() }
+) {
+    Column(modifier) {
+        CountUpText(
+            value = value,
+            style = MaterialTheme.typography.headlineMedium,
+            color = onBg,
+            fromValue = 0.0,
+            format = format
+        )
+        Spacer(Modifier.height(2.dp))
+        FigureLabel(label, muted)
+    }
+}
+
+/** The mono small-caps caption under a figure — §6's one sanctioned off-scale rung (8-9sp). */
+@Composable
+private fun FigureLabel(label: String, muted: Color) {
+    Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp)
 }
 
 /** A dot-plus-caption legend line for charts drawn openly on the page. */

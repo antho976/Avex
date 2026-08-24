@@ -1,119 +1,46 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.forge.app.ui.gym.train.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.forge.app.domain.units.formatVolume
-import com.forge.app.ui.common.bounceClick
-import com.forge.app.ui.common.CountUpText
+import com.forge.app.ui.common.EditorialHeader
 import com.forge.app.ui.common.statsEntrance
-import com.forge.app.ui.theme.ForgeMotion
+import com.forge.app.ui.theme.ForgePrGold
 import com.forge.app.ui.theme.LocalForgeSettings
-import androidx.compose.ui.unit.sp
-import com.forge.app.domain.mood.Mood
 import com.forge.app.ui.gym.train.state.ExerciseHighlight
 
-@Composable
-internal fun FlatStat(value: String, label: String, onBg: Color, muted: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = onBg, fontWeight = FontWeight.SemiBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = muted.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 0.5.sp)
-    }
-}
-
 /**
- * Like [FlatStat] but the big number rolls up from 0 on first appearance (session-end celebration) —
- * reuses the Stats motion kit's [CountUpText] so reduced motion collapses it to an instant value.
+ * ONE vertical padding for every row on this sheet (§7) — the recap lifts and the coach's coverage
+ * readings share it, so the sheet reads as a single rhythm rather than two stacked lists.
  */
-@Composable
-internal fun CountUpStat(value: Double, label: String, onBg: Color, muted: Color, format: (Double) -> String) {
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        CountUpText(
-            value = value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = onBg,
-            fromValue = 0.0,
-            format = format
-        )
-        Text(label, style = MaterialTheme.typography.labelSmall, color = muted.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 0.5.sp)
-    }
-}
-
-@Composable
-internal fun MoodPrompt(selected: Mood?, onSelect: (Mood) -> Unit, onBg: Color, muted: Color, outline: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("HOW DID IT FEEL?", style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Mood.entries.forEach { mood ->
-                MoodChip(
-                    mood = mood,
-                    isSelected = selected == mood,
-                    onClick = { onSelect(mood) },
-                    onBg = onBg,
-                    muted = muted,
-                    outline = outline,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun MoodChip(mood: Mood, isSelected: Boolean, onClick: () -> Unit, onBg: Color, muted: Color, outline: Color, modifier: Modifier = Modifier) {
-    // Crossfade the selection colours instead of hard-swapping them — the picker is prominent on the
-    // summary, so the instant flip read cheap. Tweens collapse to instant under reduced motion.
-    val bgColor by animateColorAsState(
-        if (isSelected) onBg.copy(alpha = 0.08f) else Color.Transparent,
-        animationSpec = ForgeMotion.standardTween(), label = "mood-bg"
-    )
-    val borderColor by animateColorAsState(
-        if (isSelected) onBg else outline.copy(alpha = 0.35f),
-        animationSpec = ForgeMotion.standardTween(), label = "mood-border"
-    )
-    val textColor by animateColorAsState(
-        if (isSelected) onBg else muted.copy(alpha = 0.7f),
-        animationSpec = ForgeMotion.standardTween(), label = "mood-text"
-    )
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .border(0.5.dp, borderColor, RoundedCornerShape(4.dp))
-            .background(bgColor)
-            .bounceClick { onClick() }
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(mood.displayName, style = MaterialTheme.typography.labelSmall, color = textColor, fontSize = 10.sp)
-    }
-}
+private val SUMMARY_ROW_PAD = 6.dp
 
 /**
- * The coach's corner of the summary: first the celebratory [coachOpinion] (what he reads from THIS
- * session), then the [CoachCaptureNudge] showing how much effort signal the session actually carried
- * (per-set RPE + per-exercise "how hard it felt") with an ask to log more so he can calibrate load
- * and rest. Purely informational; effort capture itself stays inline during the session.
+ * The coach's corner of the summary: first his read of THIS session, then how much effort signal
+ * the session actually carried (per-set RPE + per-exercise "how hard it felt") with an ask to log
+ * more so he can calibrate load and rest. Purely informational; effort capture itself stays inline
+ * during the session.
+ *
+ * Two fixes to how this section READ (2026-08-24). The coverage used to sit in a bordered grey box:
+ * §1 gives a fill only to something you can tap, so the readings are drawn on the sheet and carry
+ * it themselves. And the hierarchy was inverted — the coach's own read was the dimmest, smallest
+ * text in its section while the capture nudge below it was brighter and larger. His read now takes
+ * the substantive `bodyMedium`/onBg voice the Coach tab already gives it, and everything under it
+ * steps down to muted, so the section reads top to bottom instead of competing with itself.
  */
 @Composable
 internal fun CoachReadSection(
@@ -124,34 +51,28 @@ internal fun CoachReadSection(
     exercisesLogged: Int,
     onBg: Color,
     muted: Color,
-    outline: Color
+    accent: Color
 ) {
     // Nothing logged → nothing for the coach to read.
     if (coachOpinion == null && exercisesLogged == 0) return
-    HorizontalDivider(color = outline.copy(alpha = 0.2f))
-    Column(
-        modifier = Modifier.fillMaxWidth().statsEntrance(1),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            "WHAT THE COACH SEES",
-            style = MaterialTheme.typography.labelSmall,
-            color = muted,
-            fontSize = 9.sp,
-            letterSpacing = 1.sp
-        )
+    Column(Modifier.fillMaxWidth().padding(top = 28.dp).statsEntrance(4)) {
+        EditorialHeader(label = "What the coach sees", muted = muted, accent = accent)
+        Spacer(Modifier.height(10.dp))
+        // The coach's substantive line, in the same voice the Coach tab gives it (CoachBlock):
+        // bodyMedium on onBg. Italic muted is his SUB-line voice, and using it here made the read
+        // itself the faintest thing in its own section.
         coachOpinion?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = onBg, lineHeight = 18.sp)
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = onBg)
+            Spacer(Modifier.height(18.dp))
         }
-        CoachCaptureNudge(setsWithRpe, totalSets, exercisesRated, exercisesLogged, onBg, muted, outline)
+        CoachCaptureNudge(setsWithRpe, totalSets, exercisesRated, exercisesLogged, onBg, muted)
     }
 }
 
 /**
- * The "give me more to work with" block. Hidden for an empty session; a quiet confirmation when every
- * lift + set carried its effort signal; otherwise the coverage is shown as two stat-style figures
- * (effort per lift, RPE per set) above a short ask. Surfacing the numbers — rather than burying them
- * in an italic line — makes it obvious at a glance how much the coach actually had to read.
+ * The "give me more to work with" block: a quiet confirmation when every lift and set carried its
+ * effort signal, otherwise the coverage as two readings above a short ask. §4.9 — the reading
+ * below a gate is progress toward it ("3 of 8 lifts"), so it stays legible before anything unlocks.
  */
 @Composable
 private fun CoachCaptureNudge(
@@ -160,115 +81,80 @@ private fun CoachCaptureNudge(
     exercisesRated: Int,
     exercisesLogged: Int,
     onBg: Color,
-    muted: Color,
-    outline: Color
+    muted: Color
 ) {
     if (exercisesLogged == 0) return
     val effortComplete = exercisesRated >= exercisesLogged
     val rpeComplete = totalSets == 0 || setsWithRpe >= totalSets
-    val complete = effortComplete && rpeComplete
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(onBg.copy(alpha = 0.05f))
-            .border(0.5.dp, outline.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (complete) {
-            Text(
-                "Full effort data this session. He can read exactly how hard it landed and tune the next one precisely.",
-                style = MaterialTheme.typography.bodySmall,
-                color = onBg,
-                lineHeight = 18.sp
-            )
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                CoverageStat("EFFORT", exercisesRated, exercisesLogged, "lifts", onBg, muted)
-                if (totalSets > 0) CoverageStat("RPE", setsWithRpe, totalSets, "sets", onBg, muted)
-            }
-            Text(
-                "Rate how hard each set feels next time and the coach can dial in your load and rest.",
-                style = MaterialTheme.typography.bodySmall,
-                color = muted,
-                lineHeight = 18.sp
-            )
-        }
-    }
-}
-
-/** One coverage figure for [CoachCaptureNudge]: a small caps label over a "done/total unit" count. */
-@Composable
-private fun CoverageStat(label: String, done: Int, total: Int, unit: String, onBg: Color, muted: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    if (effortComplete && rpeComplete) {
         Text(
-            label,
+            "Full effort data this session. He can read exactly how hard it landed and tune the " +
+                "next one precisely.",
+            style = MaterialTheme.typography.bodySmall,
+            color = muted
+        )
+        return
+    }
+    CoverageRow("Effort", exercisesRated, exercisesLogged, "lifts", onBg, muted)
+    if (totalSets > 0) CoverageRow("RPE", setsWithRpe, totalSets, "sets", onBg, muted)
+    Spacer(Modifier.height(10.dp))
+    Text(
+        "Rate how hard each set feels next time and the coach can dial in your load and rest.",
+        style = MaterialTheme.typography.bodySmall,
+        color = muted
+    )
+}
+
+/**
+ * One coverage reading: mono label, mono count on the end. Both voices are mono so the pair reads
+ * as METRIC meta under the coach's line (§6 — row/metric labels are labelLarge) rather than as a
+ * second sentence competing with it.
+ */
+@Composable
+private fun CoverageRow(label: String, done: Int, total: Int, unit: String, onBg: Color, muted: Color) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = SUMMARY_ROW_PAD),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            label.uppercase(),
             style = MaterialTheme.typography.labelSmall,
-            color = muted.copy(alpha = 0.6f),
-            fontSize = 9.sp,
-            letterSpacing = 0.5.sp
+            color = muted,
+            modifier = Modifier.weight(1f)
         )
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("$done/$total", style = MaterialTheme.typography.bodyMedium, color = onBg, fontWeight = FontWeight.SemiBold)
-            Text(unit, style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 10.sp)
-        }
+        // Lower case, matching the "4 sets · 3.2k lb" meta on the recap rows just above (§11 —
+        // small-caps is for the LABEL, not for mono meta).
+        Text("$done of $total $unit", style = MaterialTheme.typography.labelLarge, color = onBg)
     }
 }
 
-@Composable
-internal fun JournalField(value: String, onValueChange: (String) -> Unit, muted: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("SESSION JOURNAL", style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("How was the session overall?", style = MaterialTheme.typography.bodySmall) },
-            minLines = 2,
-            maxLines = 5
-        )
-    }
-}
-
-internal val SESSION_TAGS = listOf("Felt Strong", "Low Energy", "On Fire", "Sick", "Rushed", "Great Session")
-
-@Composable
-internal fun TagPicker(selected: Set<String>, onToggle: (String) -> Unit, onBg: Color, muted: Color, outline: Color) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("TAG THIS SESSION", style = MaterialTheme.typography.labelSmall, color = muted, fontSize = 9.sp, letterSpacing = 1.sp)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SESSION_TAGS.forEach { tag ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .border(0.5.dp, if (tag in selected) onBg else outline.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
-                        .background(if (tag in selected) onBg.copy(alpha = 0.08f) else Color.Transparent)
-                        .bounceClick { onToggle(tag) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(tag, style = MaterialTheme.typography.labelSmall, color = if (tag in selected) onBg else muted.copy(alpha = 0.7f), fontSize = 10.sp)
-                }
-            }
-        }
-    }
-}
-
+/** One lift from the session: what you did on it, and the gold star if it was a PR. */
 @Composable
 internal fun HighlightRow(h: ExerciseHighlight, onBg: Color, muted: Color) {
     val weightUnit = LocalForgeSettings.current.weightUnit
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = SUMMARY_ROW_PAD),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text(h.exerciseName, style = MaterialTheme.typography.bodySmall, color = onBg)
-            Text("${h.setsLogged} sets · ${formatVolume(h.volumeLb, weightUnit)}", style = MaterialTheme.typography.bodySmall, color = muted, fontSize = 10.sp)
+            Text(h.exerciseName, style = MaterialTheme.typography.bodyMedium, color = onBg)
+            Text(
+                "${h.setsLogged} sets · ${formatVolume(h.volumeLb, weightUnit)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = muted
+            )
         }
+        // §5 — PR gold is reserved for exactly this mark, and the live set row already draws it,
+        // so a PR reads the same here as it did the moment it landed.
         if (h.isPr) {
-            Text("PR", color = onBg, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, letterSpacing = 0.5.sp)
+            Text(
+                "★",
+                style = MaterialTheme.typography.labelSmall,
+                color = ForgePrGold,
+                modifier = Modifier.semantics { contentDescription = "Personal record" }
+            )
         }
     }
 }

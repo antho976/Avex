@@ -584,7 +584,14 @@ available beside it. Custom moves stay out of Your gear because they store no eq
 
 ### Sheets
 
-- SessionSummarySheet (minimal)
+- SessionSummarySheet — rebuilt on the Modal recipe 2026-08-23: `surface` fill, mono eyebrow
+  over the serif day name, four `EditorialFigure`s (volume/minutes/sets/exercises) with the PR
+  count as a fifth above them, `EditorialHeader` + air where hairlines used to sit, the coach's
+  coverage unboxed into two mono readings under his line (which took the substantive bodyMedium
+  /onBg voice the Coach tab gives it — italic muted had made the read the faintest thing in its own
+  section), and `Complete` as an accent-filled `ForgeHeroAction` at the end. It is still the ONLY
+  exit (swipe-to-dismiss stays blocked). Mood/tag/journal pickers deleted with their dead
+  components; `EditorialCountUpFigure` was promoted to `ui/common/` for its figures.
 - CardioSessionDetailSheet
 - heatmap "That day"
 - ExerciseLibraryPicker (`singleSelect` = radio-style choose-one for swaps — accent-wash pick, no

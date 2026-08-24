@@ -46,7 +46,8 @@ class SessionOpinionTest {
     }
 
     @Test fun `fallback when nothing notable`() {
-        assertTrue(opinion()!!.startsWith("Solid work"))
+        // The fallback leans on the set count — the one fact it always has (§11: no poster clichés).
+        assertTrue(opinion(setCount = 9)!!.startsWith("9 sets in the bank"))
     }
 
     @Test fun `low completion appends a caveat`() {

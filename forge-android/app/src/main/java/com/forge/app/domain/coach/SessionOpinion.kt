@@ -34,7 +34,9 @@ object SessionOpinion {
             vsLastVolumeDelta != null && vsLastVolumeDelta > 0 -> "Volume's up on last time. Momentum is building."
             vsLastVolumeDelta != null && vsLastVolumeDelta < 0 ->
                 "A touch lighter than last time. Fine if it was planned, otherwise watch recovery."
-            else -> "Solid work in the bank. Consistency is what moves the needle."
+            // Was a poster cliché, which §11 bans. It is the fallback branch, so it leans on the
+            // one fact it always has: the sets you logged.
+            else -> "$setCount sets in the bank. No new ground today, and most sessions look like this."
         }
 
         // At most one gentle, actionable caveat — keep the finish moment encouraging.
