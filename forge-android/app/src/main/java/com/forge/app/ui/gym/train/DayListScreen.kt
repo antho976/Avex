@@ -64,26 +64,34 @@ fun DayListScreen(
     onOpenCardio: () -> Unit = {},
     onLogFreestyle: () -> Unit = {},
     onBuildPlan: () -> Unit = {},
-    /** Stats → consistency-heatmap day sheet → a gym session's detail screen. */
-    onOpenSession: (Long) -> Unit = {},
-    /** Stats → consistency-heatmap day sheet → a cardio session's detail screen. */
-    onOpenCardioSession: (Long) -> Unit = {},
     initialTab: Int = 0,
-    /** Top-bar heading — "Stats" / "PRs" when hosting those sub-screens, "GYM" by default. */
+    /**
+     * Top-bar heading. Empty for a screen that names itself with its own content hero (§4.6 — the
+     * top bar is ← plus at most one action, never the screen's name); Stats does exactly that.
+     */
     title: String = "GYM",
     viewModel: DayListViewModel = hiltViewModel()
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(title, style = MaterialTheme.typography.headlineLarge) },
-                navigationIcon = {
-                    if (onBack != null) IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
+            // A bar with no title and no back arrow is 64dp of empty chrome above the page's own
+            // answer, so it is not drawn at all. Stats is exactly that case: it names itself with
+            // its content hero and rides the hub pager, where the bottom bar owns navigation (§4.6).
+            if (title.isNotEmpty() || onBack != null) {
+                TopAppBar(
+                    title = {
+                        if (title.isNotEmpty()) {
+                            Text(title, style = MaterialTheme.typography.headlineLarge)
+                        }
+                    },
+                    navigationIcon = {
+                        if (onBack != null) IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
         },
         containerColor = Color.Transparent
     ) { inner ->
@@ -94,11 +102,7 @@ fun DayListScreen(
                 // onOpenHistory/onOpenNotes/onOpenRecap stay wired into DayListScreen (and HubScreen)
                 // so the history/notes/recap routes keep an entry point, but the rebuilt Stats screen
                 // no longer surfaces them, so they aren't forwarded here.
-                1 -> StatsContent(
-                    modifier = Modifier.fillMaxSize(),
-                    onOpenSession = onOpenSession,
-                    onOpenCardioSession = onOpenCardioSession
-                )
+                1 -> StatsContent(modifier = Modifier.fillMaxSize())
                 else -> TrainTab(
                     onOpenDay = onOpenDay,
                     onOpenDayQuick = onOpenDayQuick,

@@ -226,8 +226,66 @@ typical compare, a reading no other screen has).
 
 ### Stats — `ui/gym/stats`
 
-one page: hero figures + muscle map → lens pills Strength/Volume/Effort/Days → drill rows → heatmap
-→ records → Banister.
+Rebuilt 2026-08-23, then restructured the same day after Antho's read: *"don't like it, looks all
+over the place."* The diagnosis he confirmed was three things — too many mark shapes, too much text,
+too many sections — and the fix was to commit to ONE grid.
+
+**The grid** (`components/StatsRow.kt`). Every section on the page draws the same three columns, so
+the whole scroll has one left edge, one bar column and one right edge:
+
+```
+Chest      ▓▓▓▓▓▓▓▓▓░░░     14/14
+Push/Pull  ▓▓▓▓▓▓│▓▓▓▓▓     23·25
+Deadlift   ▓▓▓▓▓▓▓▓▓│░    2.28×
+```
+
+`RowMark` has three treatments — `Meter`, `Split`, `Banded` — that differ ONLY in how the bar is
+filled, never in geometry, so they read as one instrument seen three ways. A section whose rows drill
+in (`Your lifts`) reserves a leading caret gutter on every row, §8's dot-gutter pattern, because a
+trailing caret in the value column wraps at 200% font scale. The one non-row mark left on the page is
+the hero's sparkline. `Banded` takes explicit `zoneColors`: the strength tiers ramp toward the accent
+because further along is better, while the fatigue scale takes §5's reserved success / warning / error
+because past the gate is a state to act on, not a bar that happens to be full.
+
+**The section shape** (`StatsRead` in `StatsCommon.kt`): a mono anchor with its verdict on the SAME
+line, then rows. Nothing else. The first build gave every section a two-line sentence carrying the
+verdict and its reading; stacked across the page that read as a wall of grey prose while the numbers
+were already in the rows. Keep a verdict to a few words — it must not wrap at 100%.
+
+That one line is still what lets the page serve every level without gating anything: week two reads
+the right-hand side of the header, year six reads the rows. Antho's rule, verbatim: *"no gating, I
+said that because I wanted something every tier can use, not to hide things."*
+
+**Hero**: mono eyebrow (`STATS · WEEK OF <date>`) → one serif momentum verdict (Gaining / Holding /
+Slipping / Baseline forming, from `OverloadSummary` against ~4 weeks back, per month) → its reading →
+the 12-week estimated-max sparkline → sessions · sets · PRs as three `EditorialFigure`s. Stats names
+itself here, so `DayListScreen` takes `title = ""` and **draws no top bar at all** when it has neither
+a title nor a back arrow — an empty `TopAppBar` was 64dp of chrome above the page's own answer.
+
+**Eleven sections, cut by question.** SHOW UP: cadence (twelve-week hit rate + the week in progress),
+what you train. STRONGER: your lifts (drilling into trend, PRs, drought vs usual pace, plateau
+prescription, load-rep curve), the relative-strength tier ladder, the rep-max ladder, each pattern
+against its own peak. ENOUGH: sets per muscle vs plan, rep ranges, balance. RECOVER: fatigue against
+the learned threshold, effort (typical set / hard share / lately), how it felt.
+
+**Zero states are drawn, never written.** A section with a fixed vocabulary draws it empty — the tier
+ladder, the rep-max rungs, the movement patterns, the balance pairs, the fatigue scale. A section
+whose rows come from data draws one n-of-m row against the REAL gate. The empty tier ladder is the
+best thing on the page for a first-week lifter: it shows the rungs every lift will be measured on
+before they have one on them.
+
+**Data**: the rebuild pulled in the already-tested aggregations the old four-tab screen computed but
+never rendered (`buildOverloadSummary`, `buildRepMaxes`, `buildPatternRadar`, `buildPrRecency`,
+`buildTimeToPr`, `buildExerciseFrequency`, `buildRepRangeDist`, `computeConsistencyStreak`,
+`buildEffortDistribution`, `buildWeeklySessionCounts`, `buildAvgRpePerSession`, and the engine's
+`plateaus`). `GymStats` is wide on purpose; the breadth is concurrent aggregate queries, not per-set
+work.
+
+**Pinned**: `StatsScreenshotTest` renders all four lenses with data and at zero, a plan-with-nothing-
+logged state, three at 200% font scale, plus AMOLED and monochrome. It captures with
+`ForgeMotion.durationScale = 0f`, because a LazyColumn item below the fold composes DURING the
+capture pass and cannot be settled by advancing the clock — which also makes these goldens the
+reduce-motion check.
 
 ### Cardio — `ui/cardio`
 

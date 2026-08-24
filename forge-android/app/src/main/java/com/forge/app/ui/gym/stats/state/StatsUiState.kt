@@ -17,51 +17,88 @@ data class WeekActivityRow(
 )
 
 /**
- * State for the rebuilt Gym → Stats screen. Trimmed to exactly what the four tabs render
- * (Strength / Volume / Body / Trends) — fields the old long-scroll screen carried but no current
- * chart reads were dropped along with their repository computation (see [StatsRepository.GymStats]).
+ * State for the rebuilt Gym → Stats screen (2026-08-23, "one grammar, four questions").
+ *
+ * The page cuts by the question a lifter asks, not by data type: SHOW UP / STRONGER / ENOUGH /
+ * RECOVER. Every field below renders on every open, at its honest zero — nothing on this screen
+ * unlocks, because depth is a property of how a read is worded, not of whether it appears.
+ * A beginner reads each section's verdict word; an advanced lifter reads the number beside it.
+ *
+ * Records and the 26-week consistency heatmap deliberately do NOT live here any more: both move to
+ * the Profile (see design/SETTLED.md, 2026-08-23), so the day-detail sheet and CalendarHeatmap
+ * components stay in the package unused rather than being deleted.
  */
 data class StatsUiState(
     val isLoading: Boolean = true,
     /** True when a stats aggregation threw — the screen shows an error message, not a silent empty. */
     val loadError: Boolean = false,
-    /** PRs on a time axis + the most-recent spelled out (Strength tab). */
-    val recentPrs: List<PrEntry> = emptyList(),
-    /** Estimated 1RM per main lift — current value + per-session history (Strength tab). */
+
+    // ── Hero ────────────────────────────────────────────────────────────────────────────────────
+    /** This ISO week vs last week, side by side — the hero's three figures. */
+    val weekComparison: PeriodComparison? = null,
+    /** Weekly average of each tracked lift's best e1RM — the hero verdict and its sparkline. */
+    val overload: OverloadSummary? = null,
+
+    // ── SHOW UP ─────────────────────────────────────────────────────────────────────────────────
+    /** Consecutive recent weeks hitting the session target (vacation weeks bridge, never break). */
+    val consistencyStreak: Int = 0,
+    /** Sessions per ISO week for the last 12 weeks, oldest → newest. Always 12 entries. */
+    val weeklySessionCounts: List<Int> = emptyList(),
+    /** Median session length per ISO week, oldest → newest — is a session bloating or shrinking. */
+    val weeklyDurations: List<WeeklyDuration> = emptyList(),
+    /** What you actually train: distinct sessions per exercise over the last 8 weeks, ranked. */
+    val exerciseFrequency: List<ExerciseFrequency> = emptyList(),
+
+    // ── STRONGER ────────────────────────────────────────────────────────────────────────────────
+    /** Estimated 1RM per main lift — current value + per-session history. */
     val e1rmLifts: List<E1rmLift> = emptyList(),
-    /** Per-exercise load-rep scatter + e1RM for the strength curve (Strength tab). */
+    /** PRs on a time axis, folded into the lift each belongs to. */
+    val recentPrs: List<PrEntry> = emptyList(),
+    /** Per-exercise load-rep scatter + e1RM for the strength curve inside a lift's drill-down. */
     val strengthCurves: List<StrengthCurve> = emptyList(),
-    /** Working sets per muscle this ISO week (Volume tab). */
-    val weeklySetsByMuscle: List<MuscleSetCount> = emptyList(),
-    /** Planned weekly sets per muscle from the active program (Volume tab). */
-    val plannedSetsByMuscle: Map<MuscleGroup, Int> = emptyMap(),
-    /** Tonnage per ISO week, deload weeks marked (Volume trend). */
-    val weeklyTonnage: List<WeeklyTonnage> = emptyList(),
-    /** Always-on push/pull + quad/ham balance bars (Volume tab, System 4 counting). */
-    val balanceRatios: List<BalanceRatioUi> = emptyList(),
-    /** Dated bodyweight points, oldest → newest — feeds the Body tab's time-axis trend. */
+    /** The ladder's prescription for a lift that has stopped moving — a chip on that lift's row. */
+    val plateauFlags: List<PlateauFlagUi> = emptyList(),
+    /** Days since the last PR, overall and per exercise — the drought reading on a lift's row. */
+    val prRecency: PrRecency? = null,
+    /** Average days between PRs per exercise — that lift's usual pace, for comparison. */
+    val timeToPr: List<TimeToPrEntry> = emptyList(),
+    /** Dated bodyweight points, oldest → newest — divides e1RM into the relative-strength read. */
     val bodyweightPoints: List<BodyweightPoint> = emptyList(),
-    /** User's sex ("male" | "female" | "") — selects the bodyweight-relative strength bands (Body tab). */
+    /** User's sex ("male" | "female" | "") — selects the bodyweight-relative strength bands. */
     val userSex: String = "",
-    /** Fatigue pulse (System 5). Null until the engine read lands or while data gates fail (Body tab). */
+    /** Best weight at each rep count on the most-trained lift — pick a working weight from it. */
+    val repMaxes: RepMaxSet? = null,
+    /** Per movement pattern: recent-window best e1RM against your own all-time peak. */
+    val patternAxes: List<PatternAxis> = emptyList(),
+
+    // ── ENOUGH ──────────────────────────────────────────────────────────────────────────────────
+    /** Working sets per muscle this ISO week. */
+    val weeklySetsByMuscle: List<MuscleSetCount> = emptyList(),
+    /** Planned weekly sets per muscle from the active program (empty in freestyle). */
+    val plannedSetsByMuscle: Map<MuscleGroup, Int> = emptyMap(),
+    /** How every logged set splits across strength / hypertrophy / endurance rep ranges. */
+    val repRange: RepRangeDist? = null,
+    /** Always-on push/pull + quad/ham balance bars (System 4 counting). */
+    val balanceRatios: List<BalanceRatioUi> = emptyList(),
+    /** Tonnage per ISO week, deload weeks marked. */
+    val weeklyTonnage: List<WeeklyTonnage> = emptyList(),
+    /** Best-ever vs average volume per day type — which session you coast through. */
+    val dayTypeVolume: List<DayTypeVolumeStats> = emptyList(),
+
+    // ── RECOVER ─────────────────────────────────────────────────────────────────────────────────
+    /** Fatigue pulse (System 5). Null until the engine read lands or while data gates fail. */
     val readinessPulse: ReadinessPulse? = null,
-    /** The learned deload score threshold — draws the threshold line + bands on the fatigue gauge (Body tab). */
+    /** The learned deload score threshold — the marked gate on the fatigue meter. */
     val readinessThreshold: Int? = null,
-    /** Per-day training load for the adherence calendar + Banister form curves (Trends tab). */
-    val dailyActivity: List<DayLoad> = emptyList(),
-    /** Count of sets at each RPE value + overall average (Trends tab). */
+    /** Count of sets at each RPE value + the overall average. */
     val rpeDistribution: List<RpeBucket> = emptyList(),
     val avgRpe: Double? = null,
-    /** Sessions per day of week + best training hour (Trends tab). */
-    val trainingTimes: TrainingTimes? = null,
-    /** PR count by day of week (Mon–Sun, index 0=Mon) (Trends tab). */
-    val prsByDayOfWeek: List<Int> = List(7) { 0 },
-    /** This ISO week vs last week, side by side (Overview tab). */
-    val weekComparison: PeriodComparison? = null,
-    /** All-time best set per lift, heaviest first (Overview "records"). */
-    val hallOfFame: List<PrRecord> = emptyList(),
-    /** Lifetime totals for the Overview at-a-glance tiles. */
-    val lifetime: LifetimeMetrics? = null
+    /** Average RPE per finished session, oldest → newest — is effort drifting up. */
+    val avgRpePerSession: List<Double> = emptyList(),
+    /** Per-week EASY / JUST RIGHT / HARD / BRUTAL counts for the last 8 weeks. */
+    val weeklyEffort: List<WeeklyEffortCounts> = emptyList(),
+    /** Per-day training load — feeds the Banister fitness / fatigue / form curves. */
+    val dailyActivity: List<DayLoad> = emptyList()
 )
 
 /** One ISO week's total tonnage for the Volume trend bars. */
@@ -247,13 +284,6 @@ data class PeriodComparison(
     val sessionsDelta: Int get() = current.sessions - previous.sessions
     val prsDelta: Int get() = current.prs - previous.prs
 }
-
-/** Behavioral insight flag — shown in the Stats/Overview screen (#41, #80). */
-data class InsightFlag(
-    val emoji: String,
-    val title: String,
-    val body: String
-)
 
 /** Session efficiency / lifetime metrics row (#40). */
 data class LifetimeMetrics(

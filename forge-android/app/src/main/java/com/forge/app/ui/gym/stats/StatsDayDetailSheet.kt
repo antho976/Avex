@@ -24,6 +24,20 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
+ * Everything logged on one calendar day. Reuses [HistoryItem] so the sheet renders the exact same
+ * rows as the History screen.
+ */
+internal data class StatsDayDetail(
+    val date: java.time.LocalDate,
+    val items: List<HistoryItem>
+)
+
+/**
+ * STAGED, NOT DEAD (2026-08-23): the consistency heatmap and this sheet leave Stats for the Profile
+ * (design/SETTLED.md). They keep compiling here so the move is an import change rather than a
+ * rewrite; the ViewModel plumbing that fed them (openDay / closeDay, the cardio + session day
+ * queries) goes back on the Profile's own ViewModel.
+ *
  * "What did I do that day?" — opened by tapping a lit day on the consistency heatmap. Renders the
  * day's gym sessions + cardio with the SAME rows as the History screen, and tapping a row drills
  * into the same detail screens History uses.

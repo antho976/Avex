@@ -132,11 +132,9 @@ fun HubScreen(
                     onOpenCardio = { goToTab(BottomTab.CARDIO) },
                     onLogFreestyle = { nav.navigate(Routes.FREESTYLE_LOG) },
                     onBuildPlan = { nav.navigate(Routes.programBuilder()) },
-                    // The consistency-heatmap day sheet drills into the same detail screens History uses.
-                    onOpenSession = { sessionId -> nav.navigate(Routes.sessionDetail(sessionId)) },
-                    onOpenCardioSession = { cardioId -> nav.navigate(Routes.cardioSession(cardioId)) },
                     initialTab = 1,
-                    title = "Stats"
+                    // Stats names itself with its own hero, so the top bar carries no title (§4.6).
+                    title = ""
                 )
                 BottomTab.HOME -> OverviewScreen(
                     onOpenAcademy = { goToTab(BottomTab.ACADEMY) },

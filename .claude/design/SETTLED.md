@@ -78,10 +78,57 @@ portrait phone only (no adaptive/tablet/landscape).
 mask stops are tuning, retuned 2026-07-09 and again 2026-07-24 when the extra text-scrim was deleted
 for good; never reintroduce a second scrim over the fade) · statsEntrance/draw tuning ·
 `BodyAnatomy.kt` (generated).
-**Known defects, fix when touched**: Home's GOALS section placement · Stats' 16dp gutter (§7 says 24 —
-left because re-flowing the polished screen needs Antho's eyes) · any screen still drawing section
+**Known defects, fix when touched**: Home's GOALS section placement · any screen still drawing section
 hairlines → migrate to air rhythm (§7). (Home's accent eyebrows + the Home/Stats section hairlines
 were fixed 2026-07-08, GYMAP-4.)
+
+## Stats, rebuilt around four questions (2026-08-23)
+
+Antho's brief: redesign the Stats page from scratch, with "data for every gym knowledge tier". His
+clarification is the load-bearing half and reads as a standing rule: *"no gating, I said that
+because I wanted something every tier can use, not to hide things."* So: no beginner mode, no
+unlock meter over an instrument, no section that appears once you have earned it. Every read renders
+on every open, and depth lives in the wording (`design/MAP.md` has the grammar).
+
+**Moved out of Stats, to the Profile** (Antho, same brief — build them there, do not re-add here):
+
+- **Records / hall of fame** — the all-time heaviest set per lift.
+- **The 26-week consistency heatmap and its day sheet.** `CalendarHeatmap.kt` and
+  `StatsDayDetailSheet.kt` stay in `ui/gym/stats/` compiling but unused, marked STAGED, so the move
+  is an import change. What has to come back with them: `StatsViewModel`'s `openDay` / `closeDay`,
+  the `StatsDayDetail` type (now in the sheet's own file), and `DayListScreen`'s / `HubScreen`'s
+  `onOpenSession` + `onOpenCardioSession` wiring, all removed here rather than left dangling.
+
+**Cut outright, and why:**
+
+- **Lifetime totals** (lifetime volume, total sessions, average session volume, average sets). A
+  past-tense tally with no decision attached is noise (§2①), the same test Home's tile wall failed.
+- **Volume by muscle in pounds.** Sets per muscle answers the same question against the plan, which
+  is the half you can act on. Two readouts of one answer, §4.3.
+- **The weekly body muscle map** from the old hero. Dominated by the sets-per-muscle target bars:
+  same population, plus the plan comparison the map cannot carry. `BodyHeatmap` itself is untouched
+  and still carries session detail and the session summary sheet.
+- **Sessions and PRs by day of week** stays cut, as removed 2026-07-01 for Antho's own reason
+  ("knowing how many sessions you do per day isn't useful"). The aggregations still run cheaply.
+- **The RPE drift sparkline.** The histogram says where sets land; the drift is one clause in that
+  section's reading instead of a second chart of the same fact.
+
+**Cut again in the same-day restructure** (Antho: "looks all over the place"), because the page had
+grown five mark layouts alternating between indented and full-bleed:
+
+- **The twelve-week cadence bar rail** — a third mark shape carrying two readings that say the same
+  thing as two rows on the shared grid.
+- **The session-length trend** — no decision attached.
+- **The weekly tonnage sparkline** and **best-vs-typical by session type** — the hero owns the page's
+  one trend line, and sets-per-muscle against the plan is the actionable "am I doing enough".
+- **The RPE histogram** — nine bars in a shape nothing else on the page used. Its three readings
+  (typical set, hard share, lately) are rows now.
+- **The Banister fitness / fatigue / form chart** — viz-only by its own admission, and a whole extra
+  chart shape. If it comes back, it belongs somewhere it can be the point rather than a footer.
+
+**Do not re-add**: a "show more" behind any instrument, an "advanced stats" toggle, or a
+"not enough data yet" line. Below a gate, a section draws progress TOWARD the real gate (§4.9,
+§12). And do not add a sixth mark shape: the grid in `components/StatsRow.kt` is the page.
 
 ## Onboarding, cut from fifteen steps to eight (2026-08-22)
 
@@ -191,7 +238,7 @@ directly. Six removals, no content cut:
   passive line sits bare, so it read as the one pressable thing and was not. Renamed
   `OnThisDayMemoryLine`; the memory itself is unchanged.
 
-Also paid down, same pass: the page gutter (20 → §7's 24; Stats' 16 is still the open defect), the
+Also paid down, same pass: the page gutter (20 → §7's 24; Stats' 16 was paid down in its 2026-08-23 rebuild), the
 spacing scale (5dp and 3dp gaps between text of different roles → one 8/12/16/20/28 rhythm, §7),
 the entrance (`tween(450)` → `ForgeMotion.enterTween`, so **Remove animations** is honoured again),
 two `fontSize =` call sites and `CardLink`'s ~24dp touch target (§14). The workout count stopped

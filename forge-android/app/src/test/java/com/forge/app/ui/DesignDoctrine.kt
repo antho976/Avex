@@ -65,8 +65,15 @@ object DesignDoctrine {
      *
      * Lower this as debt is paid down; raising it is a reviewable decision, not a convenience.
      * `design/AUDIT.md` has the per-rule breakdown and the recommended order of paydown.
+     *
+     * 866 -> 839 (2026-08-23) when Gym → Stats was rebuilt against §3's archetype and seven of its
+     * files were retired: 12 off-ladder alphas, 8 redundant `fontSize`, 3 clamped user strings, the
+     * last Stats divider, its one unlabelled clickable, and the Stats top-bar title (the page now
+     * names itself with its own hero, §4.6). `ui/gym/stats/` carries zero debt on every rule except
+     * one sanctioned 9sp caption in the staged day-detail sheet. The ProfileScreen 0.5 alpha in the
+     * same drop was fixed on main earlier without the ratchet being lowered; this banks it.
      */
-    const val ALLOWLIST_BASELINE = 866
+    const val ALLOWLIST_BASELINE = 839
 
     data class Violation(val rule: String, val path: String, val token: String, val line: Int) {
         /**
