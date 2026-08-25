@@ -190,7 +190,8 @@ internal fun GalleryStrip(
     fileFor: (ProgressPhoto) -> File,
     onOpenGallery: () -> Unit,
     palette: SurfacePalette,
-    muted: Color
+    muted: Color,
+    locked: Boolean = false,
 ) {
     Box(Modifier.padding(horizontal = 24.dp)) {
         // Label only. `SectionAnchor` with no action renders exactly the same mono anchor the other
@@ -204,7 +205,7 @@ internal fun GalleryStrip(
         )
     }
     Spacer(Modifier.height(12.dp))
-    if (photos.isEmpty()) {
+    if (locked || photos.isEmpty()) {
         // Empty is drawn (§12), and the zero-shape is the STRIP — a run of ghost cells that runs off
         // the edge exactly as the real filmstrip does, not a single boxed frame. One frame alone read
         // as a lone empty container rather than as this section with nothing in it yet.
@@ -255,19 +256,19 @@ internal fun GalleryStrip(
                             // text measures 2.35:1 on Pearl, so it never carries meaning alone.
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    "+ ",
+                                    if (locked) "" else "+ ",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    "First photo",
+                                    if (locked) "Unlock photos" else "First photo",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                             }
                             Spacer(Modifier.height(5.dp))
                             Text(
-                                "Same pose, same light.",
+                                if (locked) "Gallery locked" else "Same pose, same light.",
                                 style = MaterialTheme.typography.bodySmall,
                                 // 0.7, the re-measured on-card floor — 0.65 fails AA on the fill.
                                 color = muted.copy(alpha = 0.7f)
