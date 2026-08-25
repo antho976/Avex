@@ -272,7 +272,9 @@ object AutoCoachPlanner {
         // 7 x 24 h window, so a Monday-morning pass counted the session logged earlier THAT Monday
         // and decided the target was met, while the Brief printed above it — reading the calendar
         // week that had just ended — said "1 short of target". Same screen, opposite conclusions.
-        val weekSessions = s.sessions.count { it.startedAt >= mondayStartMs(s.nowMs, s.zoneId) }
+        val thisWeekStart = mondayStartMs(s.nowMs, s.zoneId)
+        val lastWeekStart = mondayStartMs(thisWeekStart - 1, s.zoneId)
+        val weekSessions = s.sessions.count { it.startedAt in lastWeekStart until thisWeekStart }
         if (fresh && inputs.sessionsTarget > 0 && weekSessions >= inputs.sessionsTarget) {
             val byMuscle = slots.groupBy { it.second.muscle }
             val candidate = byMuscle.entries.mapNotNull { (muscle, muscleSlots) ->

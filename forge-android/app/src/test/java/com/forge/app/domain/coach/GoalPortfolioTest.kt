@@ -139,8 +139,8 @@ class GoalPortfolioTest {
     @Test
     fun conditioningGoal_countsThisWeeksActiveMinutesOnly() {
         val cardio = listOf(
-            CardioEntry(1, date = now - 2 * day, type = "run", durationMin = 40),
-            CardioEntry(2, date = now - 3 * day, type = "walk", durationMin = 30),
+            CardioEntry(1, date = now, type = "run", durationMin = 40),
+            CardioEntry(2, date = now, type = "walk", durationMin = 30),
             // A rest row and an old row must not count.
             CardioEntry(3, date = now - day, type = "rest", durationMin = 0, restReason = "sore"),
             CardioEntry(4, date = now - 20 * day, type = "run", durationMin = 60)
@@ -179,8 +179,8 @@ class GoalPortfolioTest {
     @Test
     fun muscleVolumeGoal_countsThisWeeksSetsOnTheMuscle() {
         val bouts = listOf(
-            bout(atDaysAgo = 2, weight = 100.0).copy(sets = List(4) { set(100.0) }),
-            bout(atDaysAgo = 5, weight = 100.0).copy(sets = List(3) { set(100.0) }),
+            bout(atDaysAgo = 0, weight = 100.0).copy(sets = List(4) { set(100.0) }),
+            bout(atDaysAgo = 0, weight = 100.0).copy(sets = List(3) { set(100.0) }),
             bout(atDaysAgo = 20, weight = 100.0).copy(sets = List(9) { set(100.0) })
         )
         val g = goal(CoachGoalKind.MUSCLE_VOLUME, target = 12.0, targetKey = MuscleGroup.CHEST.code)

@@ -83,7 +83,7 @@ interface CoachDao {
      */
     @Query(
         "UPDATE coach_decision SET status = 'folded' " +
-            "WHERE status = 'applied' AND outcome != 'failed' " +
+            "WHERE status = 'applied' AND outcome <> 'failed' " +
             "AND type IN ('volume_up','volume_down','rep_shift','swap')"
     )
     suspend fun foldAllAppliedDeltas()
@@ -91,7 +91,7 @@ interface CoachDao {
     /** Single-day variant (re-roll): only this day's per-(day,exercise) deltas were cleared. */
     @Query(
         "UPDATE coach_decision SET status = 'folded' " +
-            "WHERE status = 'applied' AND outcome != 'failed' AND day_key = :dayKey " +
+            "WHERE status = 'applied' AND outcome <> 'failed' AND day_key = :dayKey " +
             "AND type IN ('volume_up','volume_down','rep_shift')"
     )
     suspend fun foldAppliedDeltasForDay(dayKey: String)
@@ -120,7 +120,7 @@ interface CoachDao {
      * both moved on, and leaving it proposed meant it kept appearing in the Brief and kept being
      * counted by summaryFor ("1 proposal for this week") indefinitely.
      */
-    @Query("UPDATE coach_decision SET status = 'skipped' WHERE status = 'proposed' AND week_id != :currentWeekId")
+    @Query("UPDATE coach_decision SET status = 'skipped' WHERE status = 'proposed' AND week_id <> :currentWeekId")
     suspend fun expireProposalsBefore(currentWeekId: String)
 
     /**

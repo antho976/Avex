@@ -79,7 +79,7 @@ class WearCodecTest {
         // ProtocolWeightUnit.G shipped as "additive" would have passed the version gate on an older
         // watch, thrown inside the decoder, and been mapped to a silent drop: the wrist falling back
         // to its idle glance mid-workout, and every republish after it dropped the same way.
-        val payload = """{"v":1,"sessionId":7,"dayTitle":"Push","exerciseName":"Bench","unit":"G"}"""
+        val payload = """{"v":1,"sessionId":7,"dayTitle":"Push","exerciseName":"Bench","startedAtMs":0,"unit":"G"}"""
         val result = WearCodec.decode<SessionLiveDto>(payload.encodeToByteArray())
         assertTrue(result is WearCodec.DecodeResult.Ok)
         assertEquals(

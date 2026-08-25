@@ -19,6 +19,7 @@ import com.forge.app.ui.nav.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 
 @HiltViewModel
+@OptIn(FlowPreview::class)
 class DayViewModel @Inject constructor(
     internal val workoutRepo: WorkoutRepository,
     internal val customizationRepo: CustomizationRepository,

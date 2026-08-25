@@ -54,21 +54,24 @@ object StandingEngine {
     )
 
     fun standings(s: StandingSnapshot, unit: WeightUnit): List<StandingMetric> = buildList {
-        add(StandingMetric("consistency", "Consistency", "${fmt1(s.sessionsPerWeek)}×/wk", pct(CONSISTENCY, s.sessionsPerWeek)))
+        val sessionsPerWeek = s.sessionsPerWeek.takeIf { it.isFinite() } ?: 0.0
+        val weeklyVolumeLb = s.weeklyVolumeLb.takeIf { it.isFinite() } ?: 0.0
+        val bestE1rmLb = s.bestE1rmLb?.takeIf { it.isFinite() && it > 0.0 }
+        add(StandingMetric("consistency", "Consistency", "${fmt1(sessionsPerWeek)}×/wk", pct(CONSISTENCY, sessionsPerWeek)))
         add(StandingMetric("streak", "Streak length", "${s.streakWeeks} wk", pct(STREAK, s.streakWeeks.toDouble())))
-        add(StandingMetric("volume", "Weekly volume", formatVolumeCompact(s.weeklyVolumeLb, unit), pct(VOLUME, s.weeklyVolumeLb)))
+        add(StandingMetric("volume", "Weekly volume", formatVolumeCompact(weeklyVolumeLb, unit), pct(VOLUME, weeklyVolumeLb)))
         // Strength percentile is omitted pre-baseline (no weighted sets yet) so the bar doesn't
         // show a misleading "TOP 99%" on a brand-new profile.
-        if (s.bestE1rmLb != null && s.bestE1rmLb > 0.0) {
+        if (bestE1rmLb != null) {
             // kg/lb read as one rounded figure ("440 lb"); stones takes the stone+lb compound so a
             // whole-stone round doesn't drop up to 13 lb of the estimate.
-            val valueText = if (unit == WeightUnit.ST) formatWeight(s.bestE1rmLb, unit)
-                else "${toDisplayWeight(s.bestE1rmLb, unit).roundToInt()} ${unitLabel(unit)}"
+            val valueText = if (unit == WeightUnit.ST) formatWeight(bestE1rmLb, unit)
+                else "${toDisplayWeight(bestE1rmLb, unit).roundToInt()} ${unitLabel(unit)}"
             add(StandingMetric(
                 key = "strength",
                 label = "Best e1RM",
                 valueText = valueText,
-                topPercent = pct(E1RM, s.bestE1rmLb)
+                topPercent = pct(E1RM, bestE1rmLb)
             ))
         }
     }

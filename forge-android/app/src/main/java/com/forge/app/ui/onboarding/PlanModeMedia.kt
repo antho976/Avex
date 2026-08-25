@@ -82,13 +82,9 @@ internal class PlanModeSync(private val expected: Int) {
  */
 @Composable
 internal fun PlanModeMedia(mode: String, sync: PlanModeSync, replays: Int = 0) {
-    // One nullable value carries both facts — "there is a video for this mode" and "this device
-    // will play it" — instead of a Boolean beside a null check the compiler flagged as a dead
-    // branch, and it hands AnimatedWebp a non-null id without relying on a smart cast.
-    val playable = rawFor(mode)
-        ?.takeIf { Build.VERSION.SDK_INT >= 28 && ForgeMotion.durationScale > 0f }
+    val playable = rawFor(mode)?.takeIf { ForgeMotion.durationScale > 0f }
     Box(Modifier.fillMaxWidth().aspectRatio(VIGNETTE_ASPECT)) {
-        if (playable != null) {
+        if (Build.VERSION.SDK_INT >= 28 && playable != null) {
             AnimatedWebp(playable, sync, replays, fallback = { PlanModeVignette(mode, Modifier.fillMaxSize(), replays) })
         } else {
             PlanModeVignette(mode, Modifier.fillMaxSize(), replays)

@@ -177,6 +177,15 @@ class AutoCoachPlannerTest {
     }
 
     @Test
+    fun volumeUp_usesTheCompletedIsoWeek() {
+        val sessions = baseSessions().dropLast(1) + session(99, startDay = 60)
+        val r = AutoCoachPlanner.evaluate(
+            snapshot(mapOf("ua1" to progressingBouts(8)), sessions = sessions), beginner(target = 1)
+        )
+        assertEquals(CoachPassStatus.HOLD, r.status)
+    }
+
+    @Test
     fun buildingFatigue_holdsWithConsolidationGuidance() {
         // Fatigue at 3/5 (sleep debt +2, sore cardio +1) — below the deload line but climbing.
         // Lifts are progressing and target is 0 (no volume_up), so the pass is otherwise quiet:

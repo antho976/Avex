@@ -83,7 +83,7 @@ class BodyweightRepository @Inject constructor(
         // granted write access. Gated on all three so onboarding (neither set) never writes, a mirror
         // failure can't break the local save above (the DB stays the single source of truth), and a
         // backdated value never lands in HC at the wrong instant (HC keeps its own history).
-        if (date == today && settings.hcWriteBodyweight.first() && health.canWriteWeight()) {
+        if (date == nowLocal.toLocalDate() && settings.hcWriteBodyweight.first() && health.canWriteWeight()) {
             health.writeWeight(weightLb, now)
         }
     }

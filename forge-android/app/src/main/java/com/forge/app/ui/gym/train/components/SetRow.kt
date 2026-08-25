@@ -243,7 +243,7 @@ fun SetRow(
         // announcing each Text node separately: "Set 2, 50 kg, 10 reps[, RPE 8][, personal record]".
         val rowDescription = buildString {
             append("Set $setIndex")
-            if (displayWeight != null) append(", $displayWeight")
+            append(", $displayWeight")
             if (isTimed) append(", held ${formatHoldLabel(set.durationSeconds ?: 0)}")
             else append(", ${set.reps} reps")
             set.rpe?.let { append(", RPE ${rpeLabel(it)}, ${rirLabel(it)} in reserve") }

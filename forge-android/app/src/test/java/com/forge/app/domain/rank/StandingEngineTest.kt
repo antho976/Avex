@@ -54,5 +54,7 @@ class StandingEngineTest {
         val volume = m.first { it.key == "volume" }
         assertEquals("NaN consistency → bottom anchor (top 95%)", 95, consistency.topPercent)
         assertEquals("NaN volume → bottom anchor (top 95%)", 95, volume.topPercent)
+        assertEquals("0×/wk", consistency.valueText)
+        assertEquals("0 lb", volume.valueText)
     }
 }

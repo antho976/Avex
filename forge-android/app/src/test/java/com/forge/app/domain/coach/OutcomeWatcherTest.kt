@@ -221,7 +221,7 @@ class OutcomeWatcherTest {
 
     @Test
     fun illnessMakesAnOpenWindowUnjudgeable() {
-        val life = LifeEvents.State.NONE.copy(sick = true)
+        val life = LifeEvents.State.NONE.copy(sick = true, sickAtMs = listOf(50 * day))
         val verdict = OutcomeWatcher.evaluate(
             listOf(decision(appliedAtDay = 40)), snapshot(), life = life
         ).single()

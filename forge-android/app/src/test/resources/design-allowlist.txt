@@ -160,7 +160,6 @@
 1 alpha ui/trophies/components/TrophyIconBadge.kt 0.55
 1 alpha wear/ui/WearComponents.kt 0.55
 6 bang data/db/dao/CardioDao.kt ! in string
-2 bang data/db/dao/CoachDao.kt ! in string
 1 bang domain/coach/AutoCoachPlanner.kt ! in string
 1 bang service/WeeklyRecapWorker.kt ! in string
 1 bang ui/gym/freestyle/ExerciseBrowserScreen.kt ! in string
