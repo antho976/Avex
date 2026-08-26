@@ -26,7 +26,7 @@ android {
         applicationId = "com.quietsoftware.avex"
         minSdk = 30 // Wear OS 3+ (every Galaxy Watch since 2021; the plan's locked floor).
         targetSdk = 35
-        versionCode = 100_089
+        versionCode = 100_090
         versionName = "0.8.8.3"
     }
 

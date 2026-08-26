@@ -37,7 +37,7 @@ android {
         applicationId = "com.quietsoftware.avex"
         minSdk = 26
         targetSdk = 35
-        versionCode = 89
+        versionCode = 90
         versionName = "0.8.8.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
