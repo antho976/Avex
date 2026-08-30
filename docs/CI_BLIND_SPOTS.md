@@ -190,8 +190,8 @@ documented and its deletion mildly inconvenient.
 
 ## What changed in response
 
-Three things in this change, chosen because they are places the pipeline is **wrong** rather than
-merely blind:
+Four things in this change, chosen because they are places the pipeline is **wrong** rather than
+merely blind — three that let a bad tree look good, and one that let a good tree look bad:
 
 ### 1. `**/*.png` no longer exempts a change from CI
 
@@ -216,7 +216,20 @@ Parse failures now count toward the failed total, and the script exits non-zero 
 cannot be trusted fails the job that printed it. `test_summary_test.py` covers both, and runs in
 `guard`.
 
-### 3. `guard` rejects tracked tooling artifacts
+### 3. The Kotlin compiler gets enough heap to finish
+
+`org.gradle.jvmargs` was `-Xmx2048m`, and the Compose lambda inlining in the Kotlin backend is this
+build's memory high-water mark. It sits close enough to that ceiling that the *same commit* compiled
+in the `verify` job and died in `instrumented` minutes later with `GC overhead limit exceeded` — two
+jobs, one tree, opposite answers.
+
+A red that is not the code's fault is the same disease as a green that is not the code's fault: both
+detach the pipeline's verdict from the thing it is meant to be a verdict about, and the second is
+only more dangerous because it is more comfortable. Raised to 4 GB, with the Kotlin daemon's own heap
+stated explicitly — it is a separate JVM that inherits the Gradle line only while it has no args of
+its own, and it is where the failure actually happens.
+
+### 4. `guard` rejects tracked tooling artifacts
 
 The build-output rule matched `build/` and `.gradle/` only. `forge-android/.kotlin/errors/` held
 four Kotlin compiler crash logs, ~70 KB, containing absolute paths from two developer machines.
