@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -28,12 +29,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.forge.app.data.db.entities.CardioEntry
+import com.forge.app.domain.cardio.CardioActivity
 import com.forge.app.domain.cardio.CardioType
 import com.forge.app.ui.cardio.components.CardioEntryRow
 import com.forge.app.ui.cardio.components.CardioPaceTrendSection
@@ -50,6 +53,7 @@ import com.forge.app.ui.common.SegmentPill
 import com.forge.app.ui.common.clickableLabeled
 import com.forge.app.ui.common.forgeItemMotion
 import com.forge.app.ui.common.statsEntrance
+import com.forge.app.ui.experiment.CardMark
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -371,7 +375,7 @@ private fun LazyListScope.weekLens(
             if (last != null) {
                 LastSessionLine(
                     entry = last, today = today, zone = zone,
-                    muted = muted, accent = accent,
+                    onBg = onBg, muted = muted, accent = accent,
                     onClick = { onOpenSession(last.id) }
                 )
             } else {
@@ -510,30 +514,42 @@ private fun LastSessionLine(
     entry: CardioEntry,
     today: LocalDate,
     zone: ZoneId,
+    onBg: Color,
     muted: Color,
     accent: Color,
     onClick: () -> Unit
 ) {
     val customs = LocalCardioTypes.current
-    val label = remember(entry, today, customs) {
+    val activity = remember(entry.type, customs) {
+        CardioActivity.resolve(entry.type, customs)
+    }
+    val ago = remember(entry.date, today, zone) {
         val date = java.time.Instant.ofEpochMilli(entry.date).atZone(zone).toLocalDate()
         val days = java.time.temporal.ChronoUnit.DAYS.between(date, today).toInt()
-        val name = com.forge.app.domain.cardio.CardioActivity.resolve(entry.type, customs).displayName
-        val ago = when (days) {
+        when (days) {
             0 -> "today"
             1 -> "yesterday"
             else -> "$days days ago"
         }
-        "Last: $name, $ago"
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickableLabeled("Open your last session", onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = muted)
+        CardMark(activity.icon, accent, size = 36.dp, glyphSize = 22.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(activity.displayName, style = MaterialTheme.typography.titleMedium, color = onBg)
+            Text(
+                "LAST SESSION · ${ago.uppercase()}",
+                style = MaterialTheme.typography.labelSmall,
+                color = muted
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Text("open →", style = MaterialTheme.typography.labelMedium, color = accent)
     }
 }
