@@ -640,3 +640,10 @@ failed — ambiguity was. The History row keeps its glyph SLOT (the left rail it
 worth having on its own), so restoring this is a one-line change at `HistoryRows.SessionRow` and
 `OverviewScreen.RecentRow`; the family itself is in git, not in the tree.
 
+## Profile Activity footer, figures collapsed (2026-08-31)
+
+The monthly calendar stays full width, but the separate ACTIVE DAYS / SESSIONS / STREAK headline
+figures are gone. They made ACTIVITY feel like two sections stacked together and took too much of
+the Profile page after the calendar had already carried the reading. The same facts now share one
+compact body line with the LESS / MORE ramp. Do not restore the figure row without first removing
+an equal amount of weight elsewhere in the section.

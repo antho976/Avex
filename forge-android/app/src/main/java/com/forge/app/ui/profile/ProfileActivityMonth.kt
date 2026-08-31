@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -63,6 +62,13 @@ import java.util.Locale
  * that height is the honest price of a month drawn as squares rather than a number to be trimmed
  * back. It buys a calendar you can actually read a date off, on the same margins as everything
  * else on the page.
+ *
+ * ## Compact footer (2026-08-31)
+ *
+ * The calendar keeps that full-width measure, but the three headline readings no longer add a
+ * second visual block beneath it. They are one compact sentence beside the ramp key now. The grid
+ * remains the section's mark; its supporting counts should not make ACTIVITY feel like two stacked
+ * sections.
  *
  * ## Why the ramp is fixed, not normalized
  *
@@ -151,6 +157,14 @@ internal fun ProfileActivityMonth(
     val activeDays = monthCounts.size
     val sessions = monthCounts.sum()
     val streak = remember(streakDays, longestStreakDays) { MonthStreak.of(streakDays, longestStreakDays) }
+    val summary = buildList {
+        add("$activeDays active day${if (activeDays == 1) "" else "s"}")
+        add("$sessions session${if (sessions == 1) "" else "s"}")
+        streak?.let {
+            add("${it.figure} ${it.noun.lowercase()}")
+            it.best?.let { best -> add(best.lowercase()) }
+        }
+    }.joinToString(" · ")
 
     val empty = MaterialTheme.colorScheme.outline.copy(alpha = MONTH_EMPTY_ALPHA)
     val future = MaterialTheme.colorScheme.outline.copy(alpha = MONTH_FUTURE_ALPHA)
@@ -216,50 +230,21 @@ internal fun ProfileActivityMonth(
                 }
             }
         }
-        // The key goes under the grid it labels, on the right rail — NOT on the readings line
-        // (Antho, 2026-08-24: "the less/more is not aligned here").
-        //
-        // The two were sharing a row, which asked an 11dp swatch strip to line up with a
-        // `headlineSmall` figure and its 9sp caption. Bottom-aligning a Row aligns boxes, not
-        // baselines, and the caption is pinned to an 18dp box that its 9sp glyphs sit high inside —
-        // so the key hung off the bottom of that box, a few dp below everything it was meant to
-        // agree with. No alignment rule fixes that pairing, because the two things do not belong on
-        // one line to begin with: a reading is a figure you take off the page, a key is the axis of
-        // the mark above it. Put back against the grid it explains, it needs no alignment at all,
-        // and the readings get the whole measure for the streak that moved down off the cover.
-        Spacer(Modifier.height(12.dp))
-        MonthRampLegend(empty, hue, muted, Modifier.align(Alignment.End))
-        Spacer(Modifier.height(18.dp))
-        // The figures the grid cannot be counted for. BEST sits off at the right margin and only
-        // when it beats the current run — printed beside an equal streak it is the same number
-        // twice, which is what it was doing up on the cover photo.
+        // The grid is the mark. Its counts and ramp share one compact footer instead of adding a
+        // second figure block beneath it, which keeps ACTIVITY from taking over the Profile page.
+        Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            FlowRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                itemVerticalAlignment = Alignment.Bottom
-            ) {
-                MonthReading("$activeDays", "ACTIVE DAYS", onBg, muted)
-                MonthReading("$sessions", if (sessions == 1) "SESSION" else "SESSIONS", onBg, muted)
-                streak?.let {
-                    MonthReading(it.figure, it.noun, onBg, muted)
-                }
-            }
-            streak?.best?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = muted,
-                    // No `maxLines = 1` (§14): two mono words with the whole right margin to
-                    // themselves have nothing to truncate for, and clamping them is how a caption
-                    // silently loses its figure at a large font scale.
-                )
-            }
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = onBg,
+                modifier = Modifier.weight(1f)
+            )
+            MonthRampLegend(empty, hue, muted)
         }
     }
 }
@@ -312,19 +297,6 @@ private fun WeekdayHeader(muted: Color) {
                 modifier = Modifier.weight(1f)
             )
         }
-    }
-}
-
-@Composable
-private fun MonthReading(figure: String, noun: String, onBg: Color, muted: Color) {
-    Row(verticalAlignment = Alignment.Bottom) {
-        Text(figure, style = MaterialTheme.typography.headlineSmall, color = onBg)
-        Spacer(Modifier.width(5.dp))
-        Text(
-            noun,
-            style = MaterialTheme.typography.labelSmall,
-            color = muted
-        )
     }
 }
 
