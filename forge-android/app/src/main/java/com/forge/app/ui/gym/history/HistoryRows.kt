@@ -173,10 +173,10 @@ private fun HistoryRow(
             Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(cs.primaryContainer),
+                .background(cs.onBackground.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = cs.primary, modifier = Modifier.size(GLYPH))
+            Icon(icon, contentDescription = null, tint = cs.onBackground, modifier = Modifier.size(GLYPH))
         }
         Spacer(Modifier.width(GLYPH_GAP))
         Column(

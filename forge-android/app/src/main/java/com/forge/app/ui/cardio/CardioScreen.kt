@@ -539,7 +539,7 @@ private fun LastSessionLine(
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CardMark(activity.icon, accent, size = 36.dp, glyphSize = 22.dp)
+        CardMark(activity.icon, onBg, size = 36.dp, glyphSize = 22.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(activity.displayName, style = MaterialTheme.typography.titleMedium, color = onBg)

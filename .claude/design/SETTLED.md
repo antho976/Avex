@@ -647,3 +647,10 @@ figures are gone. They made ACTIVITY feel like two sections stacked together and
 the Profile page after the calendar had already carried the reading. The same facts now share one
 compact body line with the LESS / MORE ramp. Do not restore the figure row without first removing
 an equal amount of weight elsewhere in the section.
+
+## History and Cardio activity marks stay neutral (2026-09-01)
+
+Accent-backed activity icons were removed from History rows and Cardio's last-session row after
+device review. The glyphs already provide wayfinding, while repeating red marks competed with the
+selected controls and action cues. Keep these marks neutral; accent remains reserved for actions,
+selection and data.
