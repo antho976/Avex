@@ -35,7 +35,7 @@ val hasReleaseKeystore = keystorePropertiesFile.exists() &&
 android {
     namespace = "com.forge.app"
     // Android 16 is both the Health Connect compile floor and the phone release target.
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.quietsoftware.avex"
