@@ -12,14 +12,14 @@
     "render:4k": "remotion render src/index.ts release out/avex-0.9-4k-picture.mp4 --overwrite --scale=2 --crf=18 && npm run render:audio && tools/deliver.sh out/avex-0.9-4k-picture.mp4 out/avex-0.9.wav out/avex-0.9-4k.mp4"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.486",
-    "@remotion/transitions": "^4.0.516",
+    "@remotion/cli": "^4.0.518",
+    "@remotion/transitions": "^4.0.518",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "remotion": "^4.0.486"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^7.0.2"
   }
 }
