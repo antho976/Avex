@@ -26,7 +26,7 @@ navigation-compose = "2.10.0"
 # 2.59.2 and not 2.60.x: 2.60 wants kotlin-stdlib and kotlin-metadata-jvm 2.3.21 and KSP 2.3.7,
 # which makes this a Kotlin toolchain upgrade rather than a Hilt one. 2.59.2 is the last release on
 # the 2.2 line this project builds with.
-hilt = "2.59.2"
+hilt = "2.60.1"
 hilt-navigation-compose = "1.4.0"
 
 # Persistence
