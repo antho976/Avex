@@ -61,7 +61,7 @@ coroutines = "1.9.0"
 kotlinx-serialization = "1.9.0"
 
 # Wear OS (W1–W4: watch app, tiles, complications, live HR)
-wear-compose = "1.4.1"
+wear-compose = "1.7.0"
 play-services-wearable = "20.0.1"
 wear-tiles = "1.6.2"
 protolayout = "1.4.2"
