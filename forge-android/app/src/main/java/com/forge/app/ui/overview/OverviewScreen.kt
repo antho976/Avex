@@ -1,5 +1,6 @@
 package com.forge.app.ui.overview
 
+import com.forge.app.core.perf.StartupTimeline
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
@@ -146,6 +147,13 @@ fun OverviewScreen(
     val spec by viewModel.spec.collectAsStateWithLifecycle()
     val coach by viewModel.coach.collectAsStateWithLifecycle()
     val slots by viewModel.slots.collectAsStateWithLifecycle()
+    // The launch's "fully drawn": Home is showing its real numbers, not the values it starts from.
+    val firstLoadDone by viewModel.firstLoadDone.collectAsStateWithLifecycle()
+    androidx.activity.compose.ReportDrawnWhen { firstLoadDone }
+    androidx.compose.runtime.SideEffect {
+        StartupTimeline.mark("home.composed")
+        if (firstLoadDone) StartupTimeline.mark("home.complete")
+    }
 
     // Keep the readings current across a day of glances (W6): a night's sleep that synced, steps
     // taken while away, and today's answer, which is date- and session-sensitive (B2).

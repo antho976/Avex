@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The perf build type only (app/build.gradle.kts): the release as shipped, plus the two things a
+  measurement needs. Merged for `perf` and absent from release and personal, so nothing here ships.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Lets a system trace (Perfetto, Macrobenchmark) see this app's own trace sections and
+             sample its stacks without making it debuggable, which would change how it runs. -->
+        <profileable android:shell="true" tools:targetApi="29" />
+
+        <!-- Eight weeks of sample training, so the screens load a real history; see the class. -->
+        <receiver
+            android:name="com.forge.app.perf.SeedSampleDataReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.forge.app.perf.SEED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

@@ -1,5 +1,6 @@
 package com.forge.app.ui.overview
 
+import com.forge.app.core.perf.StartupTimeline
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.forge.app.core.time.Clock
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -67,6 +69,16 @@ class OverviewViewModel @Inject constructor(
      * flagged them as dead. Both are in the history if that branch returns.
      */
 
+    // Each of Home's four sources has answered at least once. Together they are "Home shows what
+    // it is going to show", which is what the launch reports as fully drawn.
+    private val stateLoaded = MutableStateFlow(false)
+    private val directiveLoaded = MutableStateFlow(false)
+    private val coachLoaded = MutableStateFlow(false)
+    private val slotsLoaded = MutableStateFlow(false)
+    val firstLoadDone: StateFlow<Boolean> =
+        combine(stateLoaded, directiveLoaded, coachLoaded, slotsLoaded) { a, b, c, d -> a && b && c && d }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     private val _body = MutableStateFlow<HomeBody?>(null)
     /** False until the first watch read answers, so a watch slot is not swapped out while it loads. */
     private val bodyRead = MutableStateFlow(false)
@@ -84,6 +96,7 @@ class OverviewViewModel @Inject constructor(
             _body.value = null
         }
         bodyRead.value = true
+        StartupTimeline.mark("home.body")
     }
     fun refreshBody() = bodyRefresh.request()
 
@@ -227,7 +240,10 @@ class OverviewViewModel @Inject constructor(
         // The day the state describes, so the goal captions below can be memoised against it
         // rather than against a goal object that may not change across a period boundary (M-32).
         s.copy(todayStartMs = todayStartMs)
-    }.flowOn(Dispatchers.Default).stateIn(
+    }.flowOn(Dispatchers.Default).onEach {
+        StartupTimeline.mark("home.state")
+        stateLoaded.value = true
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
         initialValue = OverviewUiState()
@@ -276,6 +292,8 @@ class OverviewViewModel @Inject constructor(
     private val directiveRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope) {
         _directive.value = runCatching { directiveRepo.today() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
+        StartupTimeline.mark("home.directive")
+        directiveLoaded.value = true
     }
     fun refreshDirective() = directiveRefresh.request()
 
@@ -325,6 +343,8 @@ class OverviewViewModel @Inject constructor(
     private val coachRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope) {
         _coach.value = runCatching { coachRepo.homeSummary() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
+        StartupTimeline.mark("home.coach")
+        coachLoaded.value = true
     }
     fun refreshCoach() = coachRefresh.request()
 
@@ -399,6 +419,9 @@ class OverviewViewModel @Inject constructor(
             ),
             watchInvite = body == HomeBody.Invite,
         )
+    }.onEach {
+        StartupTimeline.mark("home.slots")
+        slotsLoaded.value = true
     }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000),
         HomeSlots(HomeSlot.DEFAULT_LEFT, HomeSlot.DEFAULT_RIGHT, emptyMap(), watchInvite = false)

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sits beside the real app in the launcher; the name says which one it is. -->
+    <string name="app_name">Avex Perf</string>
+</resources>

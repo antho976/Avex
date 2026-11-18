@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.forge.app.core.perf.StartupTimeline
 import com.forge.app.data.prefs.SettingsRepository
 import com.forge.app.data.repo.ProgramRepository
 import com.forge.app.service.ReminderScheduler
@@ -46,7 +47,9 @@ class ForgeApp : Application(), Configuration.Provider {
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     override fun onCreate() {
+        StartupTimeline.mark("app.create")
         super.onCreate()
+        StartupTimeline.mark("app.injected")
         installCrashLogger()
         if (isDebuggable()) installStrictMode()
         appScope.launch(Dispatchers.IO) {
@@ -56,6 +59,7 @@ class ForgeApp : Application(), Configuration.Provider {
                 // reset that can't finish must not stop the app from starting.
                 runCatching { resetRepository.get().finishInterruptedFactoryReset() }
                 startupGate.complete()
+                StartupTimeline.mark("storage.ready")
                 startAppServices()
             } catch (failure: Exception) {
                 startupGate.fail(failure)

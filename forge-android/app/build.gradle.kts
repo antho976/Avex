@@ -105,6 +105,18 @@ android {
             // :shared and :wear have no `personal` build type; they build as release here.
             matchingFallbacks += listOf("release")
         }
+        // The build performance is measured on: the release (R8, the shipped baseline profile),
+        // installed BESIDE the real app as com.quietsoftware.avex.perf so a measurement run never
+        // replaces a working install or touches its data. src/perf adds only what measuring needs:
+        // `profileable`, so a system trace can see into it, and the sample-data receiver, so the
+        // screens have a real history to load. Always debug-signed; it is never distributed.
+        // `tools/perf/coldstart.sh` builds on it (docs/perf/README.md).
+        create("perf") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            applicationIdSuffix = ".perf"
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {

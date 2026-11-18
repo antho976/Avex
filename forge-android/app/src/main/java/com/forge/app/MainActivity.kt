@@ -57,6 +57,7 @@ import com.forge.app.service.AutoBackupWorker
 import com.forge.app.ui.common.ProvideTouchExploration
 import com.forge.app.ui.launch.LaunchCover
 import com.forge.app.ui.launch.launchIconFromComponent
+import com.forge.app.core.perf.StartupTimeline
 import com.forge.app.ui.launch.playSplashExit
 import com.forge.app.ui.launch.systemSplashDrawsIcon
 import com.forge.app.ui.nav.ForgeNavHost
@@ -363,6 +364,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTimeline.mark("activity.create")
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         pendingImportUri = savedInstanceState?.getString(PENDING_IMPORT_URI_KEY)?.let(Uri::parse)
@@ -404,6 +406,7 @@ class MainActivity : FragmentActivity() {
                 }
                 return@launch
             }
+        StartupTimeline.mark("activity.storage")
         // Consume the restore flag on a fresh launch only (not a config-change recreate) and queue the
         // confirmation for the notifications feed — the silent boot-swap otherwise gives no sign at all.
         // The feed holds it until cleared, so rotation no longer needs saveable dialog state.
@@ -509,6 +512,7 @@ class MainActivity : FragmentActivity() {
         // wanted the app open but their physique photos protected unlocked the gallery, pressed
         // Home, and the Recents thumbnail showed the photo grid — with screenshots and screen
         // recording working normally on it. The lock guarded the door and left the window open.
+        StartupTimeline.mark("prefs.read")
         applyPrivacyMode(startup.privacyMode || startup.appLockEnabled || startup.galleryLockEnabled)
         appLock.primeEnabled(startup.appLockEnabled, startup.galleryLockEnabled)
         applyAdaptiveWindowBackground(startup.amoledMode)
@@ -601,7 +605,9 @@ class MainActivity : FragmentActivity() {
             // is laid out under the splash, and that is when the splash may go.
             LaunchedEffect(onboardingDone) {
                 if (onboardingDone != null) {
+                    StartupTimeline.mark("gate.known")
                     withFrameNanos { }
+                    StartupTimeline.mark("content.frame")
                     contentReady = true
                 }
             }
@@ -613,6 +619,7 @@ class MainActivity : FragmentActivity() {
                     launchSettled = true
                 }
             }
+            LaunchedEffect(launchSettled) { if (launchSettled) StartupTimeline.mark("launch.settled") }
 
             CompositionLocalProvider(LocalForgeSettings provides uiSettings) {
                 ForgeTheme(
