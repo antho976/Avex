@@ -32,6 +32,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -58,6 +59,9 @@ import com.forge.app.ui.common.ProvideTouchExploration
 import com.forge.app.ui.launch.LaunchCover
 import com.forge.app.ui.launch.launchIconFromComponent
 import com.forge.app.core.perf.StartupTimeline
+import com.forge.app.ui.launch.HOME_LOAD_HOLD_MS
+import com.forge.app.ui.launch.LAUNCH_HAND_OFF_MS
+import com.forge.app.ui.launch.LocalOnHomeLoaded
 import com.forge.app.ui.launch.playSplashExit
 import com.forge.app.ui.launch.systemSplashDrawsIcon
 import com.forge.app.ui.nav.ForgeNavHost
@@ -70,19 +74,22 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.forge.app.ui.theme.ForgeMotion
 import com.forge.app.ui.theme.ForgeTheme
 import com.forge.app.ui.theme.ForgeUiSettings
+import com.forge.app.ui.theme.toUiSettings
 import com.forge.app.ui.theme.LocalForgeSettings
 import com.forge.app.ui.theme.forgeBackgroundGradient
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import javax.inject.Inject
@@ -144,6 +151,9 @@ class MainActivity : FragmentActivity() {
      * 2 s safety cap ran out. The splash is held until then, and its hand-off starts from it.
      */
     private var contentReady by mutableStateOf(false)
+
+    /** Home's first load has finished (LocalOnHomeLoaded). The splash is held for it, briefly. */
+    private var homeLoaded by mutableStateOf(false)
 
     /** The launch hand-off has finished (or there was none: a recreation). Gates the lock prompt
      *  and the import dialog so neither lands on top of the fade. */
@@ -367,6 +377,7 @@ class MainActivity : FragmentActivity() {
         StartupTimeline.mark("activity.create")
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) (application as? ForgeApp)?.warmForLaunch()
         pendingImportUri = savedInstanceState?.getString(PENDING_IMPORT_URI_KEY)?.let(Uri::parse)
         enableEdgeToEdge()
         // Secure before the first frame, including while recovery or preferences are slow.
@@ -385,7 +396,16 @@ class MainActivity : FragmentActivity() {
             splash.setKeepOnScreenCondition { !contentReady }
             splash.setOnExitAnimationListener { provider -> playSplashExit(provider) { launchSettled = true } }
         }
-        setContent { StartupMessage("Preparing Avex…", coverIcon = coverIcon, showMessage = coverIcon == null || startupSlow) }
+        // The settings the first screen needs, when the read the Application started has already
+        // landed (it usually has). Then nothing below has to wait, and the coroutine that follows
+        // runs straight through to the real `setContent` inside this `onCreate`: the first frame
+        // the app draws is Home. Otherwise the placeholder goes up while the read finishes.
+        val preloaded = settingsRepo.startupPreferencesIfLoaded()
+        if (preloaded == null) {
+            setContent { StartupMessage("Preparing Avex…", coverIcon = coverIcon, showMessage = coverIcon == null || startupSlow) }
+        } else {
+            StartupTimeline.mark("prefs.preloaded")
+        }
         lifecycleScope.launch { delay(2000); contentReady = true; startupSlow = true }
         // A staged restore restarts the app as soon as it is in the foreground, from any screen.
         lifecycleScope.launch {
@@ -475,7 +495,20 @@ class MainActivity : FragmentActivity() {
         // Read off Main with a bounded wait. A failed/stalled read uses the remembered privacy
         // protections; no real app content is composed before these flags and gates are primed.
         var startupReadFailed = false
-        val startup = withContext(Dispatchers.IO) {
+        if (preloaded != null) {
+            // What the read below does on success, off the main thread (it opens a file).
+            lifecycleScope.launch(Dispatchers.IO) {
+                ProtectionSentinel.remember(
+                    this@MainActivity,
+                    ProtectionSentinel.Protections(
+                        privacyMode = preloaded.privacyMode,
+                        appLockEnabled = preloaded.appLockEnabled,
+                        galleryLockEnabled = preloaded.galleryLockEnabled
+                    )
+                )
+            }
+        }
+        val startup = preloaded ?: withContext(Dispatchers.IO) {
             runCatching { withTimeout(2000) { settingsRepo.startupPreferences() } }
                 .onSuccess { ok ->
                     ProtectionSentinel.remember(
@@ -547,50 +580,24 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
+            // One collector over the settings snapshot, seeded from the snapshot the startup read just
+            // loaded: the first composition already wears the user's theme, units and week, where
+            // fifteen flows starting from defaults drew those first and recomposed the whole tree.
+            // (Date format and Compact set logging are not plumbed: nothing read them, and their
+            // controls left Settings, 2026-09-26 audit, `design/SETTLED.md`.)
+            val seed = remember { settingsRepo.lastPreferences?.let(settingsRepo::values) }
             val uiSettingsFlow = remember {
-                // Date format and Compact set logging are no longer plumbed: nothing read them, and
-                // their controls left Settings (2026-09-26 audit, `design/SETTLED.md`).
-                combine(
-                    settingsRepo.amoledMode,
-                    settingsRepo.weightUnit,
-                    settingsRepo.timeFormat24h,
-                    settingsRepo.firstDayMonday,
-                    settingsRepo.hapticStrength
-                ) { amoled, weightUnit, timeFormat24h, firstDayMonday, haptic ->
-                    ForgeUiSettings(
-                        amoledMode = amoled,
-                        weightUnit = weightUnit,
-                        timeFormat24h = timeFormat24h,
-                        firstDayMonday = firstDayMonday,
-                        hapticStrength = haptic
-                    )
-                }.combine(settingsRepo.hiddenOverviewTiles) { s, hidden ->
-                    s.copy(hiddenOverviewTiles = hidden)
-                }.combine(settingsRepo.keepScreenOn) { s, v ->
-                    s.copy(keepScreenOn = v)
-                }.combine(settingsRepo.overviewTileOrder) { s, order ->
-                    s.copy(overviewTileOrder = order)
-                }.combine(settingsRepo.pinnedGoals) { s, keys ->
-                    s.copy(pinnedGoalKeys = keys)
-                }.combine(settingsRepo.effectiveAccentHex) { s, v ->
-                    s.copy(accentColorHex = v)
-                }.combine(settingsRepo.accentEnabled) { s, v ->
-                    s.copy(accentEnabled = v)
-                }.combine(settingsRepo.plateWeightLb) { s, v ->
-                    s.copy(plateWeightLb = v)
-                }.combine(settingsRepo.firstWorkoutDone) { s, v ->
-                    s.copy(firstWorkoutDone = v)
-                }.combine(settingsRepo.useMiles) { s, v ->
-                    s.copy(useMiles = v)
-                }
+                settingsRepo.preferences.map { settingsRepo.values(it).toUiSettings() }.distinctUntilChanged()
             }
-            val uiSettings by uiSettingsFlow.collectAsState(initial = ForgeUiSettings())
+            val uiSettings by uiSettingsFlow.collectAsState(initial = seed?.toUiSettings() ?: ForgeUiSettings())
             // A failed read emits null and the flow ENDS (allPreferences catches, emits once, completes),
             // so the gate would sit on the empty null branch for the whole process. Collected here so its
             // end is visible: ending on null means the read failed, and Retry re-collects.
             var prefsAttempt by remember { mutableIntStateOf(0) }
             var prefsReadFailed by remember { mutableStateOf(false) }
-            val onboardingDone by produceState<Boolean?>(initialValue = null, prefsAttempt) {
+            // Seeded the same way, so Home (or onboarding) composes in this first pass rather than
+            // one settings round trip later. Unknown (null) only when the startup read failed.
+            val onboardingDone by produceState<Boolean?>(initialValue = seed?.onboardingDone, prefsAttempt) {
                 prefsReadFailed = false
                 settingsRepo.onboardingDoneOrUnknown.collect { value = it }
                 if (value == null) prefsReadFailed = true
@@ -606,6 +613,15 @@ class MainActivity : FragmentActivity() {
             LaunchedEffect(onboardingDone) {
                 if (onboardingDone != null) {
                     StartupTimeline.mark("gate.known")
+                    // Home is composed, but its numbers are still being read: today's answer, the
+                    // coach row and the two readings land a few frames later. Uncovering it now
+                    // showed its starting values and then a second arrival, with the coach row
+                    // pushing the page down as it came in. The splash waits for that load instead
+                    // (about 50 ms), so Home is shown once, finished. Onboarding and a failed read
+                    // have nothing to wait for.
+                    if (onboardingDone == true) {
+                        withTimeoutOrNull(HOME_LOAD_HOLD_MS) { snapshotFlow { homeLoaded }.first { it } }
+                    }
                     withFrameNanos { }
                     StartupTimeline.mark("content.frame")
                     contentReady = true
@@ -615,7 +631,7 @@ class MainActivity : FragmentActivity() {
             // hand-off also settles by itself once its fade would have finished.
             LaunchedEffect(contentReady) {
                 if (contentReady && !launchSettled) {
-                    delay(ForgeMotion.nominalDuration(ForgeMotion.DurationStandard) + 150L)
+                    delay(ForgeMotion.nominalDuration(LAUNCH_HAND_OFF_MS) + 150L)
                     launchSettled = true
                 }
             }
@@ -631,7 +647,11 @@ class MainActivity : FragmentActivity() {
                     ProvideTouchExploration {
                         // The app lock is provided here so both this top-level gate and the gallery
                         // gate (ForgeNavHost) share one session (GYMAP-69).
-                        CompositionLocalProvider(LocalAppLock provides appLock) {
+                        val onHomeLoaded = remember { { homeLoaded = true } }
+                        CompositionLocalProvider(
+                            LocalAppLock provides appLock,
+                            LocalOnHomeLoaded provides onHomeLoaded
+                        ) {
                         // The lock state is read HERE so the nav host beneath can be hidden from the
                         // accessibility tree while it applies. FLAG_SECURE blocks pixels; it does not
                         // block semantics, and the gate was a sibling drawn OVER a still-composed

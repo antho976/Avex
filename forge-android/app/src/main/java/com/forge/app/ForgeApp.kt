@@ -36,6 +36,7 @@ class ForgeApp : Application(), Configuration.Provider {
     @Inject lateinit var wearStatePublisher: dagger.Lazy<com.forge.app.service.wear.WearStatePublisher>
     @Inject lateinit var resetRepository: dagger.Lazy<com.forge.app.data.repo.ResetRepository>
     @Inject lateinit var workoutRepository: dagger.Lazy<com.forge.app.data.repo.WorkoutRepository>
+    @Inject lateinit var adaptationRepository: dagger.Lazy<com.forge.app.data.repo.AdaptationRepository>
     private val startupGate = StartupGate()
     internal suspend fun awaitStorageReady() = startupGate.await()
 
@@ -52,18 +53,58 @@ class ForgeApp : Application(), Configuration.Provider {
         StartupTimeline.mark("app.injected")
         installCrashLogger()
         if (isDebuggable()) installStrictMode()
+        // The settings file, started now rather than when the first screen asks for it. Everything
+        // reads it (the Activity cannot compose real content without it), and loading it took about
+        // 40 ms of a launch during which the main thread had nothing else to wait for. It still
+        // waits behind the gate below, so a restore is applied before the file is opened.
+        appScope.launch(Dispatchers.IO) { runCatching { settingsRepository.preferencesSnapshot() } }
         appScope.launch(Dispatchers.IO) {
             try {
                 applyPendingRestore()
                 // Before the gate opens, so no screen reads a half-wiped database. Fail-soft: a
                 // reset that can't finish must not stop the app from starting.
-                runCatching { resetRepository.get().finishInterruptedFactoryReset() }
+                // The marker is checked here first: asking Hilt for the repository builds the
+                // database and seventeen other dependencies, which held the gate (and so the first
+                // read of the settings) shut on every launch to learn that there was nothing to do.
+                if (File(filesDir, com.forge.app.data.repo.ResetRepository.PENDING_FACTORY_RESET).exists()) {
+                    runCatching { resetRepository.get().finishInterruptedFactoryReset() }
+                }
                 startupGate.complete()
                 StartupTimeline.mark("storage.ready")
                 startAppServices()
             } catch (failure: Exception) {
                 startupGate.fail(failure)
                 runCatching { writeCrashLog(failure) }
+            }
+        }
+    }
+
+    private val launchWarmed = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * A launch into the UI has begun: build what Home's first answer is made of now, on background
+     * threads, instead of when Home composes.
+     *
+     * Today's directive and the coach row are both read off the whole-history coach snapshot, and
+     * building it was the longest thing a launch waited for: Home asked for it only once it had
+     * composed, and showed its starting values until it arrived. Started here it is under way
+     * while the Activity is still inflating, and Home's own request joins the build in flight
+     * (AdaptationRepository.snapshotCached shares one build between callers).
+     *
+     * Called by the Activity, not from [onCreate]: a process started for the widget, a worker or a
+     * wrist command has no Home to answer, and would load the whole history for nothing.
+     */
+    internal fun warmForLaunch() {
+        if (!launchWarmed.compareAndSet(false, true)) return
+        appScope.launch {
+            runCatching {
+                awaitStorageReady()
+                // A snapshot built before the program has loaded describes the seed split, and
+                // would be thrown away. [startAppServices] is what loads it.
+                com.forge.app.program.Program.readiness
+                    .first { it != com.forge.app.program.Program.Readiness.PENDING }
+                adaptationRepository.get().snapshotCached()
+                StartupTimeline.mark("snapshot.warm")
             }
         }
     }
@@ -78,6 +119,7 @@ class ForgeApp : Application(), Configuration.Provider {
             // the load, so a boot-time failure is logged here rather than crashing the process from
             // this root coroutine — and the reminder below is still re-armed.
             runCatching { programRepository.get().ensureLoaded() }.onFailure { runCatching { writeCrashLog(it) } }
+            StartupTimeline.mark("program.loaded")
             // Finish any regeneration that died between its program transaction and the deload
             // marker beside it (M-06). Two stores, no shared transaction: this is what stops them
             // disagreeing forever. Fail-soft — a reconciliation that throws must not stop startup.

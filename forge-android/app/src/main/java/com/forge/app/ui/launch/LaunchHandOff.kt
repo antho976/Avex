@@ -55,6 +55,30 @@ import kotlinx.coroutines.coroutineScope
 internal const val SETTLE_SCALE = 0.875f
 
 /**
+ * How long the splash takes to fade once the first screen is ready under it: the Fast token.
+ *
+ * Short on purpose (2026-11-18). The splash is held until Home has its real numbers (see
+ * [HOME_LOAD_HOLD_MS]), so what it uncovers is finished and has nothing left to settle: the fade
+ * is the whole hand-off, and every millisecond of it is a millisecond before the app can be used.
+ * It was the Standard 240 ms, over a Home that then also faded in for 320 ms and rose for 450 ms.
+ */
+internal const val LAUNCH_HAND_OFF_MS = ForgeMotion.DurationFast
+
+/**
+ * The longest the splash is held for Home to finish its first load, counted from the moment Home
+ * could have been shown. Home loads in about 50 ms on a Galaxy S21 Ultra; a phone or a history slow
+ * enough to pass this gets Home as it is, filling in, which is what every launch used to get.
+ */
+internal const val HOME_LOAD_HOLD_MS = 250L
+
+/**
+ * Called by Home when its first load has finished: today's answer, the coach row and both
+ * readings are in. The Activity provides it and holds the splash for it; anywhere else (a
+ * preview, a screenshot test) it does nothing.
+ */
+val LocalOnHomeLoaded = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
+/**
  * The icon a launch started from: the `.icon.<Name>` alias the launcher tapped, or null when the app
  * was opened another way (a widget, a notification), which the caller resolves from the enabled
  * alias instead. Pure, so it is pinned by `LaunchHandOffTest`.
@@ -69,11 +93,11 @@ internal val systemSplashDrawsIcon: Boolean get() = Build.VERSION.SDK_INT >= 31
 
 /**
  * Android 12+: fade the system splash's icon while it settles to [SETTLE_SCALE], and fade the splash
- * itself so Home shows through, over ForgeMotion's standard duration. With animations removed the
- * splash is simply taken away.
+ * itself so Home shows through, over [LAUNCH_HAND_OFF_MS]. With animations removed the splash is
+ * simply taken away.
  */
 fun playSplashExit(provider: SplashScreenViewProvider, onDone: () -> Unit = {}) {
-    val duration = ForgeMotion.nominalDuration(ForgeMotion.DurationStandard).toLong()
+    val duration = ForgeMotion.nominalDuration(LAUNCH_HAND_OFF_MS).toLong()
     val splash: View = provider.view
     if (duration <= 0L) {
         provider.remove()
@@ -112,8 +136,8 @@ fun LaunchCover(icon: AppIcon, ready: Boolean, onGone: () -> Unit = {}) {
         if (ForgeMotion.animationsOff) {
             fade.snapTo(0f)
         } else coroutineScope {
-            val a = async { fade.animateTo(0f, ForgeMotion.exitTween()) }
-            val b = async { scale.animateTo(SETTLE_SCALE, ForgeMotion.exitTween()) }
+            val a = async { fade.animateTo(0f, ForgeMotion.exitTween(LAUNCH_HAND_OFF_MS)) }
+            val b = async { scale.animateTo(SETTLE_SCALE, ForgeMotion.exitTween(LAUNCH_HAND_OFF_MS)) }
             a.await(); b.await()
         }
         gone = true

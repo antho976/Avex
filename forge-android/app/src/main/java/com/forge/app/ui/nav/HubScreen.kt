@@ -58,6 +58,7 @@ fun HubScreen(
 ) {
     val coachEnabled by viewModel.coachEnabled.collectAsStateWithLifecycle()
     val freestyleMode by viewModel.freestyleMode.collectAsStateWithLifecycle()
+    androidx.compose.runtime.SideEffect { com.forge.app.core.perf.StartupTimeline.mark("hub.composed") }
     // The Coach tab is shown only when the coach is on AND the user follows a plan — a freestyle user
     // has nothing to coach against.
     val showCoach = coachEnabled && !freestyleMode

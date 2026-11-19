@@ -1,7 +1,7 @@
 package com.forge.app.ui.overview
 
+import kotlinx.coroutines.flow.first
 import com.forge.app.core.perf.StartupTimeline
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,12 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -76,7 +74,6 @@ import com.forge.app.ui.goals.customGoalTitle
 import com.forge.app.ui.goals.goalCaption
 import com.forge.app.ui.overview.state.OverviewRecentItem
 import com.forge.app.ui.overview.state.OverviewUiState
-import com.forge.app.ui.theme.ForgeMotion
 import com.forge.app.ui.theme.LocalForgeSettings
 import com.forge.app.ui.theme.OpenColors
 import com.forge.app.ui.theme.OpenIcons
@@ -150,9 +147,13 @@ fun OverviewScreen(
     // The launch's "fully drawn": Home is showing its real numbers, not the values it starts from.
     val firstLoadDone by viewModel.firstLoadDone.collectAsStateWithLifecycle()
     androidx.activity.compose.ReportDrawnWhen { firstLoadDone }
-    androidx.compose.runtime.SideEffect {
-        StartupTimeline.mark("home.composed")
-        if (firstLoadDone) StartupTimeline.mark("home.complete")
+    androidx.compose.runtime.SideEffect { StartupTimeline.mark("home.composed") }
+    val onHomeLoaded = com.forge.app.ui.launch.LocalOnHomeLoaded.current
+    LaunchedEffect(Unit) {
+        androidx.compose.runtime.snapshotFlow { firstLoadDone }.first { it }
+        StartupTimeline.mark("home.complete")
+        // The launch is holding the splash for this (LaunchHandOff.kt).
+        onHomeLoaded()
     }
 
     // Keep the readings current across a day of glances (W6): a night's sleep that synced, steps
@@ -160,11 +161,7 @@ fun OverviewScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshBody()
-                viewModel.refreshDirective()
-                viewModel.refreshCoach()
-            }
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.onResume()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -174,15 +171,9 @@ fun OverviewScreen(
         state.pendingMilestone?.let { viewModel.onMilestoneShown(it.id) }
     }
 
-    // Rise + fade on the first show after a cold launch only; swiping back to Home just shows it.
-    var entrancePlayed by rememberSaveable { mutableStateOf(false) }
-    val entry = remember { Animatable(if (entrancePlayed) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (!entrancePlayed) {
-            entry.animateTo(1f, animationSpec = ForgeMotion.enterTween(450))
-            entrancePlayed = true
-        }
-    }
+    // Home has no entrance of its own. It used to rise and fade in over 450 ms on a cold launch,
+    // which kept it moving for a third of a second after the splash had gone; now the splash is
+    // held until Home is loaded and fades to a page that is already in place (LaunchHandOff.kt).
 
     var pickingSlot by remember { mutableStateOf<Boolean?>(null) }
 
@@ -223,10 +214,6 @@ fun OverviewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .graphicsLayer {
-                    alpha = entry.value
-                    translationY = (1f - entry.value) * 18.dp.toPx()
-                }
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
         ) {

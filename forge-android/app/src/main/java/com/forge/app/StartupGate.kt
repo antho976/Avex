@@ -2,6 +2,7 @@ package com.forge.app
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import com.forge.app.core.perf.StartupTimeline
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
@@ -53,9 +54,9 @@ internal class StartupOpenHelperFactory(private val context: Context) : SupportS
             }
 
             override val writableDatabase: SupportSQLiteDatabase
-                get() { awaitGate(); return helper.writableDatabase }
+                get() { awaitGate(); return helper.writableDatabase.also { StartupTimeline.mark("db.open") } }
             override val readableDatabase: SupportSQLiteDatabase
-                get() { awaitGate(); return helper.readableDatabase }
+                get() { awaitGate(); return helper.readableDatabase.also { StartupTimeline.mark("db.open") } }
         }
     }
 }

@@ -40,7 +40,23 @@ def millis(seconds, ms):
     return int(seconds or 0) * 1000 + int(ms)
 
 
+def device_ready():
+    """Why this launch would not be a fair one, or None. A phone that is asleep, locked or in a
+    call still launches the app, but nothing is drawn or resumed on time, and the run reads as a
+    multi-second start that no person would have seen."""
+    power = adb("shell", "dumpsys", "power")
+    if "mWakefulness=Awake" not in power:
+        return "the screen is off"
+    if "isKeyguardShowing=true" in adb("shell", "dumpsys", "window"):
+        return "the phone is locked"
+    if re.search(r"mCallState=[12]", adb("shell", "dumpsys", "telephony.registry")):
+        return "a call is ringing or in progress"
+    return None
+
+
 def one_run(package, settle):
+    if reason := device_ready():
+        raise SystemExit(f"not measuring: {reason}")
     adb("shell", "am", "force-stop", package)
     time.sleep(1.5)
     adb("logcat", "-c")
@@ -76,9 +92,16 @@ def main():
     if args.package not in adb("shell", "pm", "list", "packages", args.package):
         raise SystemExit(f"{args.package} is not installed (./gradlew :app:installPerf)")
 
-    runs = []
+    runs, discarded = [], []
     for i in range(args.runs):
         run = one_run(args.package, args.settle)
+        # A launch on which Home never composed was interrupted (a call arriving, a notification
+        # opened, someone using the phone), or onboarding is not finished on this install. It is
+        # kept in the raw file and left out of the table.
+        if "home.composed" not in run or "system.displayed" not in run:
+            discarded.append(run)
+            print(f"run {i + 1:2d}: discarded, Home did not come up (interrupted, or not onboarded)", file=sys.stderr)
+            continue
         runs.append(run)
         print(f"run {i + 1:2d}: displayed {run.get('system.displayed', '?')} ms, "
               f"fully drawn {run.get('system.fullyDrawn', '?')} ms", file=sys.stderr)
@@ -86,8 +109,10 @@ def main():
 
     if args.raw:
         with open(args.raw, "w") as f:
-            json.dump({"package": args.package, "runs": runs}, f, indent=1)
+            json.dump({"package": args.package, "runs": runs, "discarded": discarded}, f, indent=1)
 
+    if not runs:
+        raise SystemExit("no launch reached Home")
     names = sorted({k for r in runs for k in r},
                    key=lambda k: statistics.median(r[k] for r in runs if k in r))
     print(f"\n{args.package}, {len(runs)} cold starts (ms since process start; system.* since the launch intent)")

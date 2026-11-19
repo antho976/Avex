@@ -103,7 +103,10 @@ class SettingsRepository @Inject constructor(
     private val allPreferences: Flow<Preferences> = context.forgePreferences.data
         .catch { e -> if (e is IOException) emit(READ_FAILED) else throw e }
         // Remembered for [lastPreferences]. A failed read is not a snapshot of anyone's settings.
-        .onEach { if (!it.readFailed) lastPreferences = it }
+        .onEach {
+            if (!it.readFailed) lastPreferences = it
+            com.forge.app.core.perf.StartupTimeline.mark("prefs.loaded")
+        }
 
     /**
      * The newest real [Preferences] any reader of this class has seen, or null before the first
@@ -276,6 +279,17 @@ class SettingsRepository @Inject constructor(
         val userSex: String get() = prefs[PreferenceKeys.USER_SEX] ?: ""
         val freestyleMode: Boolean get() = prefs[PreferenceKeys.FREESTYLE_MODE] ?: false
         val coachEnabled: Boolean get() = prefs[PreferenceKeys.COACH_ENABLED] ?: true
+        val onboardingDone: Boolean get() = prefs[PreferenceKeys.ONBOARDING_DONE] ?: false
+        val firstWorkoutDone: Boolean get() = prefs[PreferenceKeys.FIRST_WORKOUT_DONE] ?: false
+        val overviewTileOrder: List<String> get() =
+            (prefs[PreferenceKeys.OVERVIEW_TILE_ORDER] ?: "gym,cardio,trophies").split(",")
+        val pinnedGoals: List<String> get() =
+            prefs[PreferenceKeys.PINNED_GOALS]?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+        val effectiveAccentHex: String get() {
+            val picked = prefs[PreferenceKeys.ACCENT_COLOR_HEX] ?: ""
+            return if (prefs[PreferenceKeys.ACCENT_FROM_ICON] != true) picked
+            else com.forge.app.appicon.AppIcon.fromKey(prefs[PreferenceKeys.APP_ICON] ?: "").accentHex ?: picked
+        }
         val programExperience: String get() = prefs[PreferenceKeys.PROGRAM_EXPERIENCE] ?: "intermediate"
         val problemAreas: Set<String> get() = prefs[PreferenceKeys.PROBLEM_AREAS] ?: emptySet()
         val priorityMuscles: Set<String> get() = prefs[PreferenceKeys.PRIORITY_MUSCLES] ?: emptySet()
@@ -402,19 +416,14 @@ class SettingsRepository @Inject constructor(
 
     // ─── Overview tile order (#64) ────────────────────────────────────────────
 
-    val overviewTileOrder: Flow<List<String>> = pref { (it[PreferenceKeys.OVERVIEW_TILE_ORDER] ?: "gym,cardio,trophies").split(",") }
+    val overviewTileOrder: Flow<List<String>> = pref { values(it).overviewTileOrder }
     suspend fun setOverviewTileOrder(order: List<String>) =
         context.forgePreferences.edit { it[PreferenceKeys.OVERVIEW_TILE_ORDER] = order.joinToString(",") }
 
     // ─── Pinned goals (Home, 2026-08-16) ─────────────────────────────────────
 
     /** Keys of the goals pinned to Home, in pin order. Home renders at most the first three. */
-    val pinnedGoals: Flow<List<String>> = pref { prefs ->
-            prefs[PreferenceKeys.PINNED_GOALS]
-                ?.split(",")
-                ?.filter { it.isNotBlank() }
-                .orEmpty()
-        }
+    val pinnedGoals: Flow<List<String>> = pref { values(it).pinnedGoals }
 
     /**
      * Adds or removes [key], preserving pin order. Capped so Home's three slots stay meaningful.
@@ -707,11 +716,7 @@ class SettingsRepository @Inject constructor(
      * to icon" is on and the icon has one, else the picked [accentColorHex] ("" = the default red).
      * The theme, the widget and the watch all read this one, so they can't disagree.
      */
-    val effectiveAccentHex: Flow<String> = pref { prefs ->
-        val picked = prefs[PreferenceKeys.ACCENT_COLOR_HEX] ?: ""
-        if (prefs[PreferenceKeys.ACCENT_FROM_ICON] != true) picked
-        else com.forge.app.appicon.AppIcon.fromKey(prefs[PreferenceKeys.APP_ICON] ?: "").accentHex ?: picked
-    }
+    val effectiveAccentHex: Flow<String> = pref { values(it).effectiveAccentHex }
 
     // ─── Locale (#116) ────────────────────────────────────────────────────────
 
@@ -820,7 +825,7 @@ class SettingsRepository @Inject constructor(
 
     /** True once the first workout is finished — gates the first-touch onboarding cards so they never
      *  reappear for a returning user (survives a DB wipe; see [PreferenceKeys.FIRST_WORKOUT_DONE]). */
-    val firstWorkoutDone: Flow<Boolean> = pref { it[PreferenceKeys.FIRST_WORKOUT_DONE] ?: false }
+    val firstWorkoutDone: Flow<Boolean> = pref { values(it).firstWorkoutDone }
     suspend fun setFirstWorkoutDone() =
         context.forgePreferences.edit { it[PreferenceKeys.FIRST_WORKOUT_DONE] = true }
 
@@ -1210,7 +1215,22 @@ class SettingsRepository @Inject constructor(
         // above had already converted the failure into a successful read of every default. Hand the
         // failure back so the first frame can be drawn from what the user actually chose.
         if (prefs.readFailed) throw PreferencesUnavailableException()
-        return StartupPreferences(
+        return startupPreferencesFrom(prefs)
+    }
+
+    /**
+     * [startupPreferences] with nothing to wait for: the same values from the snapshot already in
+     * memory, or null when the settings have not been read in this process yet.
+     *
+     * The Application starts that read as the process starts, so by the time the Activity is
+     * created it has usually landed. The Activity can then put the real first screen up inside
+     * `onCreate`, where it used to draw a placeholder frame, hop to a background thread for a value
+     * that was already loaded, and compose the real screen one frame later.
+     */
+    fun startupPreferencesIfLoaded(): StartupPreferences? = lastPreferences?.let(::startupPreferencesFrom)
+
+    private fun startupPreferencesFrom(prefs: Preferences): StartupPreferences =
+        StartupPreferences(
             // Through [protection], exactly like the flows. Reading `prefs[KEY] ?: false` here left
             // the corruption case wide open: the handler replaces an unparseable file with a
             // SUCCESSFUL empty store, so `readFailed` is false and the throw above does not fire,
@@ -1227,7 +1247,6 @@ class SettingsRepository @Inject constructor(
             appIcon = prefs[PreferenceKeys.APP_ICON] ?: "",
             themedLaunchIntro = prefs[PreferenceKeys.THEMED_LAUNCH_INTRO] ?: false
         )
-    }
 
     /** The first-frame settings — see [startupPreferences]. Defaults match each flow's own default. */
     data class StartupPreferences(
@@ -1287,7 +1306,7 @@ class SettingsRepository @Inject constructor(
 
     // ─── Onboarding (#1) ──────────────────────────────────────────────────────
 
-    val onboardingDone: Flow<Boolean> = pref { it[PreferenceKeys.ONBOARDING_DONE] ?: false }
+    val onboardingDone: Flow<Boolean> = pref { values(it).onboardingDone }
     /**
      * The same flag for the app's first-screen gate, with a failed read reported as null ("unknown")
      * rather than false. [onboardingDone] cannot tell a storage failure from a user who has not

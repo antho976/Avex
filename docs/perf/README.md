@@ -41,15 +41,28 @@ What the marks mean, in the order a launch reaches them:
 | `app.create` | `Application.onCreate` begins (process and class loading are behind it) |
 | `app.injected` | Hilt has built what the Application injects |
 | `storage.ready` | boot-time restore and reset checks are done; storage may open |
+| `prefs.loaded` | the settings file is in memory (the Application starts this read) |
 | `activity.create` | `MainActivity.onCreate` begins |
+| `prefs.preloaded` | the settings were already in memory, so the first screen is composed inside `onCreate`; absent when the Activity had to wait for them |
 | `activity.storage` | the Activity has seen storage become ready |
-| `prefs.read` | the settings needed before any content have been read |
-| `gate.known` | the app knows whether it is showing Home or onboarding |
-| `home.composed` | Home has composed for the first time |
-| `content.frame` | Home's first frame is laid out; the splash may go |
-| `home.state`, `home.directive`, `home.coach`, `home.slots`, `home.body` | each of Home's sources has answered |
-| `home.complete` | all of them have; this is also when `Fully drawn` is reported |
+| `db.open` | Room has opened the database |
+| `prefs.read` | the settings needed before any content are in hand |
+| `program.loaded` | the training program is loaded from the database |
+| `snapshot.warm` | the whole-history coach snapshot, started at launch, is built |
+| `nav.composed`, `hub.composed`, `home.composed` | the nav host, the hub pager and Home have each composed for the first time |
+| `gate.known` | the first content composition has been applied |
+| `home.body`, `home.coach`, `home.directive`, `home.state`, `home.slots` | each of Home's sources has answered |
+| `home.complete` | all of them have, and the spec line; the splash is released on this |
+| `content.frame` | Home is loaded and laid out; the splash may go |
 | `launch.settled` | the splash hand-off has finished |
+
+`system.displayed` is the first frame the system could show (the splash is held over it), and
+`system.fullyDrawn` is Home reporting itself loaded. Both are counted from the launch intent, about
+85 ms before the process exists on the S21 Ultra; the marks are counted from the process start.
+
+A launch that never reaches `home.composed` was interrupted: a call arriving, the screen locking,
+someone using the phone. The harness refuses to start while the phone is asleep, locked or in a
+call, and such a run should be thrown away rather than averaged in.
 
 ## What a person sees
 
@@ -61,4 +74,5 @@ adb shell screenrecord --time-limit 6 /sdcard/launch.mp4 &   # then launch the a
 ```
 
 `screenrecord` writes a frame only when the screen changes, so the first changed frame is the tap
-landing and the last one is the picture coming to rest.
+landing and the last frame that changes the picture visibly is it coming to rest. Faint changes
+long after that (a scrollbar fading, a badge) are not the launch.

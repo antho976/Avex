@@ -35,3 +35,29 @@ data class ForgeUiSettings(
 )
 
 val LocalForgeSettings = compositionLocalOf { ForgeUiSettings() }
+
+/**
+ * Every field above from ONE settings snapshot, each through the getter its own flow reads, so
+ * this and a single flow can never disagree on a default.
+ *
+ * The app root used to assemble this from fifteen separate flows, starting from `ForgeUiSettings()`:
+ * the first composition drew every default (lb, the default accent, a Monday week) and the whole
+ * tree recomposed when the real values arrived. From a snapshot the first composition is already
+ * the user's own settings, and one collector replaces fifteen.
+ */
+fun com.forge.app.data.prefs.SettingsRepository.PreferenceValues.toUiSettings() = ForgeUiSettings(
+    amoledMode = amoledMode,
+    weightUnit = weightUnit,
+    useMiles = useMiles,
+    hiddenOverviewTiles = hiddenOverviewTiles,
+    pinnedGoalKeys = pinnedGoals,
+    overviewTileOrder = overviewTileOrder,
+    timeFormat24h = timeFormat24h,
+    firstDayMonday = firstDayMonday,
+    hapticStrength = hapticStrength,
+    keepScreenOn = keepScreenOn,
+    accentColorHex = effectiveAccentHex,
+    accentEnabled = accentEnabled,
+    plateWeightLb = plateWeightLb,
+    firstWorkoutDone = firstWorkoutDone
+)

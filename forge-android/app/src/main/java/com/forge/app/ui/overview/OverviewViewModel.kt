@@ -75,8 +75,9 @@ class OverviewViewModel @Inject constructor(
     private val directiveLoaded = MutableStateFlow(false)
     private val coachLoaded = MutableStateFlow(false)
     private val slotsLoaded = MutableStateFlow(false)
+    private val specLoaded = MutableStateFlow(false)
     val firstLoadDone: StateFlow<Boolean> =
-        combine(stateLoaded, directiveLoaded, coachLoaded, slotsLoaded) { a, b, c, d -> a && b && c && d }
+        combine(stateLoaded, directiveLoaded, coachLoaded, slotsLoaded, specLoaded) { a, b, c, d, e -> a && b && c && d && e }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _body = MutableStateFlow<HomeBody?>(null)
@@ -90,7 +91,10 @@ class OverviewViewModel @Inject constructor(
      * against the user's own usual (see [homeBodyReadings]). Fail-soft: a read error hides the
      * section rather than showing a broken one.
      */
-    private val bodyRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope) {
+    // The three reads below run off the main thread (they await repositories and publish to state
+    // flows, nothing else), so each starts the moment it is asked for. On the main thread they
+    // queued behind the frame that was composing Home, which is exactly when they are first asked.
+    private val bodyRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope, Dispatchers.Default) {
         runCatching { loadBody() }.onFailure {
             if (it is kotlinx.coroutines.CancellationException) throw it
             _body.value = null
@@ -137,7 +141,12 @@ class OverviewViewModel @Inject constructor(
 
     /** "Go with the flow" — when on, the home leads with freestyle logging instead of a next-up day. */
     val freestyleMode: StateFlow<Boolean> =
-        settingsRepo.freestyleMode.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), false)
+        settingsRepo.freestyleMode.stateIn(
+            viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+            // From the settings already in memory, so a freestyle user's Home does not open on the
+            // planned-day hero and switch.
+            settingsRepo.lastPreferences?.let { settingsRepo.values(it).freestyleMode } ?: false
+        )
 
     /** True when there is no program at all (build-your-own, not yet built) — home offers "build a plan".
      *  Seeds from the already-loaded facade so a no-plan user never flashes the "Start session" branch
@@ -289,7 +298,7 @@ class OverviewViewModel @Inject constructor(
      * Recompute today's answer (Coach v3 B2). Called at open and on resume: a directive that still
      * says "Push day" after you've trained, or after midnight, is worse than no directive.
      */
-    private val directiveRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope) {
+    private val directiveRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope, Dispatchers.Default) {
         _directive.value = runCatching { directiveRepo.today() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
         StartupTimeline.mark("home.directive")
@@ -335,12 +344,14 @@ class OverviewViewModel @Inject constructor(
         )
         if (exercises == 0) null else SessionSpec(exercises, sets, minutes)
     }.flowOn(Dispatchers.Default)
+        // The spec line is part of the hero: computed from a state that has loaded, it is in.
+        .onEach { if (stateLoaded.value) specLoaded.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _coach = MutableStateFlow<com.forge.app.data.repo.CoachHomeSummary?>(null)
     /** The COACH row: open calls and changes on watch. Null hides the row. */
     val coach: StateFlow<com.forge.app.data.repo.CoachHomeSummary?> = _coach
-    private val coachRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope) {
+    private val coachRefresh = com.forge.app.core.ConflatedRefresh(viewModelScope, Dispatchers.Default) {
         _coach.value = runCatching { coachRepo.homeSummary() }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
         StartupTimeline.mark("home.coach")
@@ -493,6 +504,33 @@ class OverviewViewModel @Inject constructor(
         // nothing a lifter needs repeated on every row.
         val wText = com.forge.app.domain.units.weightInputValue(top.topWeightLb!!, weightUnit)
         return "${compactLiftName(top.exerciseName)} $wText×${top.topReps ?: 0}"
+    }
+
+    /** The screen has come to the front. The first time is Home appearing, which [init] below
+     *  already loads for; every later one (back from a workout, a swipe back to Home, the app
+     *  returning from the background) re-reads what changes with the day and with training. */
+    private var resumedBefore = false
+    fun onResume() {
+        if (!resumedBefore) { resumedBefore = true; return }
+        refreshBody()
+        refreshDirective()
+        refreshCoach()
+    }
+
+    // Last in the class, after every property it touches has been initialised.
+    init {
+        // Home's first load starts here, as the view model is created, rather than when the screen
+        // has finished composing and its lifecycle reports the resume: the reads run on background
+        // threads while the main thread lays the page out, so they land with its first frame.
+        refreshBody()
+        refreshDirective()
+        refreshCoach()
+        // The same for the three shared flows. They start their database reads on the first
+        // subscriber, and the screen subscribes only after it has composed. Subscribing here for a
+        // moment starts them now; the screen takes over within the five seconds they stay warm.
+        viewModelScope.launch { kotlinx.coroutines.withTimeoutOrNull(5_000) { state.first { stateLoaded.value } } }
+        viewModelScope.launch { kotlinx.coroutines.withTimeoutOrNull(5_000) { slots.first { slotsLoaded.value } } }
+        viewModelScope.launch { kotlinx.coroutines.withTimeoutOrNull(5_000) { spec.first { specLoaded.value } } }
     }
 }
 

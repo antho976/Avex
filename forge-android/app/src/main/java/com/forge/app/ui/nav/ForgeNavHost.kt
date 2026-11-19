@@ -4,7 +4,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
@@ -20,17 +19,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontStyle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -75,6 +73,7 @@ fun ForgeNavHost(
     privacyPolicyRequest: Int = 0
 ) {
     val nav = rememberNavController()
+    androidx.compose.runtime.SideEffect { com.forge.app.core.perf.StartupTimeline.mark("nav.composed") }
     // App-wide "push" navigation (Material shared-axis X): a short directional slide + fade
     // rather than a full-width slide-and-fade — the eye travels less so it reads snappier.
     // Incoming content decelerates in; outgoing accelerates away (ForgeMotion easings).
@@ -88,14 +87,9 @@ fun ForgeNavHost(
     // The five hubs (Cardio/Stats/Overview/Coach/Academy) are pages of HubScreen's pager, reached by
     // swipe — they aren't nav destinations. Only the deep "mode" screens remain, and they RISE as modals.
     val modalRoutes = ModalRoutes
-    // One-shot fade so the first screen eases in on cold launch instead of snapping on.
-    var appeared by remember { mutableStateOf(false) }
-    val rootAlpha by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0f,
-        animationSpec = ForgeMotion.standardTween(dur),
-        label = "cold-start"
-    )
-    LaunchedEffect(Unit) { appeared = true }
+    // No fade-in of its own on a cold launch (there was one, 320 ms). The splash fading away is
+    // what reveals the first screen (ui/launch/LaunchHandOff.kt); a second fade under it only kept
+    // the screen dim, and untappable-looking, after the splash had already gone.
 
     // "I'll make my own" lands on Home, which shows the "No plan yet · Build a plan" state (its program
     // was cleared in onboarding), rather than jumping straight into the builder.
@@ -212,7 +206,7 @@ fun ForgeNavHost(
     NavHost(
         navController = nav,
         startDestination = Routes.OVERVIEW,
-        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = rootAlpha },
+        modifier = Modifier.fillMaxSize(),
         enterTransition = {
             if (targetState.destination.route in modalRoutes)
                 slideInVertically(ForgeMotion.enterTween(dur)) { rise(it) } + fadeIn(ForgeMotion.enterTween(dur))
