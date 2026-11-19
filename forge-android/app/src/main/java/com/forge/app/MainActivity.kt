@@ -605,8 +605,9 @@ class MainActivity : FragmentActivity() {
             // onboarding completes, so the next one starts clean; a rotation keeps the current pass.
             var onboardingPass by rememberSaveable { mutableIntStateOf(0) }
             LaunchedEffect(onboardingDone) { if (onboardingDone == true) onboardingPass++ }
-            // The first screen is composed once the gate knows which one it is; one frame later it
-            // is laid out under the splash, and that is when the splash may go.
+            // The first screen is composed once the gate knows which one it is. The splash may go
+            // when that screen is ready to be shown: at once for onboarding, and for Home when its
+            // first load is in.
             LaunchedEffect(onboardingDone) {
                 if (onboardingDone != null) {
                     StartupTimeline.mark("gate.known")
