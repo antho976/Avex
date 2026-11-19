@@ -377,7 +377,6 @@ class MainActivity : FragmentActivity() {
         StartupTimeline.mark("activity.create")
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) (application as? ForgeApp)?.warmForLaunch()
         pendingImportUri = savedInstanceState?.getString(PENDING_IMPORT_URI_KEY)?.let(Uri::parse)
         enableEdgeToEdge()
         // Secure before the first frame, including while recovery or preferences are slow.

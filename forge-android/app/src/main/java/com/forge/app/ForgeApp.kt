@@ -36,7 +36,6 @@ class ForgeApp : Application(), Configuration.Provider {
     @Inject lateinit var wearStatePublisher: dagger.Lazy<com.forge.app.service.wear.WearStatePublisher>
     @Inject lateinit var resetRepository: dagger.Lazy<com.forge.app.data.repo.ResetRepository>
     @Inject lateinit var workoutRepository: dagger.Lazy<com.forge.app.data.repo.WorkoutRepository>
-    @Inject lateinit var adaptationRepository: dagger.Lazy<com.forge.app.data.repo.AdaptationRepository>
     private val startupGate = StartupGate()
     internal suspend fun awaitStorageReady() = startupGate.await()
 
@@ -75,36 +74,6 @@ class ForgeApp : Application(), Configuration.Provider {
             } catch (failure: Exception) {
                 startupGate.fail(failure)
                 runCatching { writeCrashLog(failure) }
-            }
-        }
-    }
-
-    private val launchWarmed = java.util.concurrent.atomic.AtomicBoolean(false)
-
-    /**
-     * A launch into the UI has begun: build what Home's first answer is made of now, on background
-     * threads, instead of when Home composes.
-     *
-     * Today's directive and the coach row are both read off the whole-history coach snapshot, and
-     * building it was the longest thing a launch waited for: Home asked for it only once it had
-     * composed, and showed its starting values until it arrived. Started here it is under way
-     * while the Activity is still inflating, and Home's own request joins the build in flight
-     * (AdaptationRepository.snapshotCached shares one build between callers).
-     *
-     * Called by the Activity, not from [onCreate]: a process started for the widget, a worker or a
-     * wrist command has no Home to answer, and would load the whole history for nothing.
-     */
-    internal fun warmForLaunch() {
-        if (!launchWarmed.compareAndSet(false, true)) return
-        appScope.launch {
-            runCatching {
-                awaitStorageReady()
-                // A snapshot built before the program has loaded describes the seed split, and
-                // would be thrown away. [startAppServices] is what loads it.
-                com.forge.app.program.Program.readiness
-                    .first { it != com.forge.app.program.Program.Readiness.PENDING }
-                adaptationRepository.get().snapshotCached()
-                StartupTimeline.mark("snapshot.warm")
             }
         }
     }

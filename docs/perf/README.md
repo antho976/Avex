@@ -48,7 +48,6 @@ What the marks mean, in the order a launch reaches them:
 | `db.open` | Room has opened the database |
 | `prefs.read` | the settings needed before any content are in hand |
 | `program.loaded` | the training program is loaded from the database |
-| `snapshot.warm` | the whole-history coach snapshot, started at launch, is built |
 | `nav.composed`, `hub.composed`, `home.composed` | the nav host, the hub pager and Home have each composed for the first time |
 | `gate.known` | the first content composition has been applied |
 | `home.body`, `home.coach`, `home.directive`, `home.state`, `home.slots` | each of Home's sources has answered |

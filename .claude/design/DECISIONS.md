@@ -8,6 +8,27 @@ an entry whenever a rule is added, changed or retired.
 
 ---
 
+## 2026-11-18 — The launch hands off a finished Home, in Fast
+
+Antho asked for the app to "open almost instantly". Timed on his phone for the first time
+(`docs/perf/BASELINE-2026-11-18.md`), the 2026-10-21 launch let the splash go as soon as the first
+screen was laid out, which was before Home had loaded: Home faded in on its starting values
+("Upper A", a filled Start session, "0 min"), then corrected its headline and button twice, took the
+coach row a moment later (which pushed the page down), and was still rising into place half a
+second after the tap.
+
+**Changed (§9, Launch).** The splash now also waits for Home's first load, at most 250 ms past
+layout; measured, it waits about 40 ms. The fade is Fast (150), was Standard (240). Home's own
+cold-launch entrance (rise and fade, 450 ms) and the nav root's fade-in (320 ms) are removed: the
+splash fading away is the entrance, and what it uncovers is finished.
+
+**Not changed.** The splash itself (the picked icon on the app's dark, settling a touch smaller),
+Remove animations making it a cut, every other screen's entrance cascade, and the motion tokens.
+Pushes and tab slides still run on Emphasized (320): measured, they are the whole of what a
+navigation takes, so shortening them is a taste call left to Antho.
+
+---
+
 ## 2026-10-17 — Settings comes back into the family: the app's grouped measures, chrome and anchors
 
 Antho: Settings "looks nice but too different from the rest". The 2026-09-26 kit was right about the
