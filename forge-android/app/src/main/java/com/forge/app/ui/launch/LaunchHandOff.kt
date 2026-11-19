@@ -1,9 +1,6 @@
 package com.forge.app.ui.launch
 
 import android.os.Build
-import android.view.View
-import android.view.animation.DecelerateInterpolator
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -13,28 +10,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
-import androidx.core.splashscreen.SplashScreenViewProvider
 import com.forge.app.appicon.AppIcon
-import com.forge.app.ui.theme.ForgeMotion
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 
 /**
- * The launch, made low-key on 2026-10-21 (Relay "Launch" designs): the splash is your app icon on the
- * app's own dark, nothing else, and it stays only until Home's first frame is ready. Then the icon
- * fades and settles a touch smaller as Home fades in. "Remove animations" makes it a cut.
+ * The launch: your app icon on the app's own dark, held only until Home is loaded, then taken away
+ * by the system. The app animates nothing (Antho, 2026-11-18: "remove the animation, no need for
+ * it, I want to jump in as fast as possible"). It used to fade the splash itself as the icon
+ * settled a touch smaller (2026-10-21): 240 ms, then 150 ms.
+ *
+ * What was measured on a Galaxy S21 Ultra, from the launcher starting to dim to Home fully shown
+ * (docs/perf/FIXES-2026-11-18.md):
+ *
+ * - **The system removes the splash, held for Home (this).** About 260 ms; Home starts to show at
+ *   about 215. What is left is the system's own short fade, which an app cannot switch off.
+ * - **An exit listener that removes the splash at once.** About 240 ms, but the system first hands
+ *   its splash view over to the app, and in 2 launches of 20 that showed Home, then the splash
+ *   again for one frame, then Home. The same hand-over sat under the old fade.
+ * - **No splash at all** (`windowDisablePreview`). Slower: about 525 ms tap to rest, where the
+ *   others take about 390. With a splash to show, the launcher starts opening on the tap, while
+ *   the app is still starting; without one it waits for the app's first frame.
+ *
+ * So there is no exit listener: `MainActivity` only sets the splash's keep condition.
  *
  * Where the icon comes from, by platform:
  *
@@ -43,26 +46,12 @@ import kotlinx.coroutines.coroutineScope
  *   platform draws the launching component's own icon — and a launcher tap starts the enabled
  *   `.icon.*` activity-alias, whose icon IS the pick (an alias's ActivityInfo carries the alias's
  *   icon, not the target's). An activity-alias cannot carry a theme of its own, so naming the icon in
- *   the theme would have pinned every pick to one drawable. [playSplashExit] then animates the
- *   system's own splash views out.
+ *   the theme would have pinned every pick to one drawable.
  * - **Android 8–11 (API 26–30).** core-splashscreen's pre-12 splash is the theme's static
  *   `windowBackground`, drawn by the system before any app code runs, so it can only be one drawable
  *   for everyone: it is the dark ground alone (`splash_blank`). The icon is drawn by [LaunchCover]
- *   from the first frame the app draws, and the same fade-and-settle plays when Home is ready.
+ *   from the first frame the app draws, and is gone in one frame when Home is ready.
  */
-
-/** How much smaller the icon settles as it fades (the design's 128 → 112). */
-internal const val SETTLE_SCALE = 0.875f
-
-/**
- * How long the splash takes to fade once the first screen is ready under it: the Fast token.
- *
- * Short on purpose (2026-11-18). The splash is held until Home has its real numbers (see
- * [HOME_LOAD_HOLD_MS]), so what it uncovers is finished and has nothing left to settle: the fade
- * is the whole hand-off, and every millisecond of it is a millisecond before the app can be used.
- * It was the Standard 240 ms, over a Home that then also faded in for 320 ms and rose for 450 ms.
- */
-internal const val LAUNCH_HAND_OFF_MS = ForgeMotion.DurationFast
 
 /**
  * The longest the splash is held for Home to finish its first load, counted from the moment Home
@@ -70,6 +59,13 @@ internal const val LAUNCH_HAND_OFF_MS = ForgeMotion.DurationFast
  * enough to pass this gets Home as it is, filling in, which is what every launch used to get.
  */
 internal const val HOME_LOAD_HOLD_MS = 250L
+
+/**
+ * How long after the first screen is ready a launch counts as settled. Nothing reports the splash
+ * gone (there is no exit listener), and the system's own fade is over well inside this. Not a
+ * motion duration: the app animates nothing over it.
+ */
+internal const val LAUNCH_SETTLED_FALLBACK_MS = 150L
 
 /**
  * Called by Home when its first load has finished: today's answer, the coach row and both
@@ -92,63 +88,17 @@ internal fun launchIconFromComponent(className: String?): AppIcon? {
 internal val systemSplashDrawsIcon: Boolean get() = Build.VERSION.SDK_INT >= 31
 
 /**
- * Android 12+: fade the system splash's icon while it settles to [SETTLE_SCALE], and fade the splash
- * itself so Home shows through, over [LAUNCH_HAND_OFF_MS]. With animations removed the splash is
- * simply taken away.
- */
-fun playSplashExit(provider: SplashScreenViewProvider, onDone: () -> Unit = {}) {
-    val duration = ForgeMotion.nominalDuration(LAUNCH_HAND_OFF_MS).toLong()
-    val splash: View = provider.view
-    if (duration <= 0L) {
-        provider.remove()
-        onDone()
-        return
-    }
-    val icon: View? = runCatching { provider.iconView }.getOrNull()
-    // The icon is a child of the splash, so fading the splash fades it too; the icon only settles.
-    icon?.animate()
-        ?.scaleX(SETTLE_SCALE)?.scaleY(SETTLE_SCALE)
-        ?.setDuration(duration)?.setInterpolator(DecelerateInterpolator())
-        ?.start()
-    splash.animate()
-        .alpha(0f)
-        .setDuration(duration)
-        .setInterpolator(DecelerateInterpolator())
-        .withEndAction {
-            provider.remove()
-            onDone()
-        }
-        .start()
-}
-
-/**
  * Android 8–11: the icon on the app's dark, drawn by the app from its first frame, until [ready]
- * (Home's first frame is drawn beneath it). Then the icon fades and settles to [SETTLE_SCALE] while
- * the ground fades to show Home, and the cover leaves composition ([onGone]).
+ * (Home is loaded and laid out beneath it). Then it is gone, and says so ([onGone]).
  */
 @Composable
 fun LaunchCover(icon: AppIcon, ready: Boolean, onGone: () -> Unit = {}) {
-    val fade = remember { Animatable(1f) }
-    val scale = remember { Animatable(1f) }
-    var gone by remember { mutableStateOf(false) }
-    LaunchedEffect(ready) {
-        if (!ready) return@LaunchedEffect
-        if (ForgeMotion.animationsOff) {
-            fade.snapTo(0f)
-        } else coroutineScope {
-            val a = async { fade.animateTo(0f, ForgeMotion.exitTween(LAUNCH_HAND_OFF_MS)) }
-            val b = async { scale.animateTo(SETTLE_SCALE, ForgeMotion.exitTween(LAUNCH_HAND_OFF_MS)) }
-            a.await(); b.await()
-        }
-        gone = true
-        onGone()
-    }
-    if (gone) return
+    LaunchedEffect(ready) { if (ready) onGone() }
+    if (ready) return
     Box(
         Modifier
             .fillMaxSize()
             .clearAndSetSemantics {}
-            .graphicsLayer { alpha = fade.value }
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
@@ -158,7 +108,6 @@ fun LaunchCover(icon: AppIcon, ready: Boolean, onGone: () -> Unit = {}) {
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(128.dp)
-                .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
                 .clip(CircleShape)
         )
     }

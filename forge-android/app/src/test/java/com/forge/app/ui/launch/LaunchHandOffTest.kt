@@ -42,6 +42,4 @@ class LaunchHandOffTest {
         assertTrue(v31.contains("""<item name="android:windowSplashScreenAnimatedIcon">@null</item>"""))
         assertTrue(v31.contains("""<item name="windowSplashScreenAnimatedIcon">@null</item>"""))
     }
-
-    @Test fun theSplashSettlesATouchSmaller() = assertEquals(112f / 128f, SETTLE_SCALE, 0.0001f)
 }

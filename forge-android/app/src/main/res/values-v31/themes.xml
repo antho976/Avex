@@ -8,8 +8,8 @@
         icon IS the pick (AppIcon / AppIconManager). An activity-alias cannot carry a theme of its
         own, so naming a drawable here would show that one drawable for every pick.
 
-        The splash holds until the first screen is laid out (2 s cap), then MainActivity's exit
-        listener fades the icon as it settles a touch smaller (ui/launch/LaunchHandOff.kt).
+        The splash holds until Home is loaded (2 s cap), then the system takes it away. The app
+        sets no exit listener and animates nothing (ui/launch/LaunchHandOff.kt says why).
     -->
     <style name="Theme.Forge.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/forge_background</item>

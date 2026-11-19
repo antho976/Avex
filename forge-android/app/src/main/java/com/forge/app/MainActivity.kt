@@ -30,7 +30,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.background
@@ -60,9 +59,8 @@ import com.forge.app.ui.launch.LaunchCover
 import com.forge.app.ui.launch.launchIconFromComponent
 import com.forge.app.core.perf.StartupTimeline
 import com.forge.app.ui.launch.HOME_LOAD_HOLD_MS
-import com.forge.app.ui.launch.LAUNCH_HAND_OFF_MS
+import com.forge.app.ui.launch.LAUNCH_SETTLED_FALLBACK_MS
 import com.forge.app.ui.launch.LocalOnHomeLoaded
-import com.forge.app.ui.launch.playSplashExit
 import com.forge.app.ui.launch.systemSplashDrawsIcon
 import com.forge.app.ui.nav.ForgeNavHost
 import com.forge.app.ui.onboarding.OnboardingScreen
@@ -156,7 +154,7 @@ class MainActivity : FragmentActivity() {
     private var homeLoaded by mutableStateOf(false)
 
     /** The launch hand-off has finished (or there was none: a recreation). Gates the lock prompt
-     *  and the import dialog so neither lands on top of the fade. */
+     *  and the import dialog so neither lands while the splash is still up. */
     private var launchSettled by mutableStateOf(false)
 
     /** The chosen app-icon key, seeded in onCreate and kept live by a collector so [onStop] never has to
@@ -381,9 +379,9 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         // Secure before the first frame, including while recovery or preferences are slow.
         applyPrivacyMode(true)
-        // The launch (2026-10-21, see ui/launch/LaunchHandOff.kt): the splash is the chosen app icon
-        // on the app's dark, held only until the first screen is ready (2 s cap), then the icon fades
-        // and settles as the screen fades in. A recreation (rotation) has no launch to hand off.
+        // The launch (see ui/launch/LaunchHandOff.kt): the splash is the chosen app icon on the
+        // app's dark, held only until the first screen is ready (2 s cap), then taken away by the
+        // system. The app animates nothing. A recreation (rotation) has no launch to hand off.
         launchSettled = savedInstanceState != null
         // Android 12+ draws the icon itself (the launching alias's own); 8 to 11 draw it here.
         val coverIcon = if (systemSplashDrawsIcon || savedInstanceState != null) null else {
@@ -391,10 +389,10 @@ class MainActivity : FragmentActivity() {
                 ?: runCatching { appIconManager.currentIcon() }.getOrDefault(AppIcon.Default)
         }
         var startupSlow by mutableStateOf(false)
-        if (systemSplashDrawsIcon) {
-            splash.setKeepOnScreenCondition { !contentReady }
-            splash.setOnExitAnimationListener { provider -> playSplashExit(provider) { launchSettled = true } }
-        }
+        // No exit listener, on purpose: with one, the system hands its splash view over to the app
+        // to be animated or removed, and that hand-over is slower than letting the system take the
+        // splash away itself (LaunchHandOff.kt has the measurements).
+        if (systemSplashDrawsIcon) splash.setKeepOnScreenCondition { !contentReady }
         // The settings the first screen needs, when the read the Application started has already
         // landed (it usually has). Then nothing below has to wait, and the coroutine that follows
         // runs straight through to the real `setContent` inside this `onCreate`: the first frame
@@ -621,16 +619,17 @@ class MainActivity : FragmentActivity() {
                     if (onboardingDone == true) {
                         withTimeoutOrNull(HOME_LOAD_HOLD_MS) { snapshotFlow { homeLoaded }.first { it } }
                     }
-                    withFrameNanos { }
+                    // No extra frame to wait for: the splash's keep condition is asked again before
+                    // every draw, and the draw it lets through lays out and paints what is loaded.
                     StartupTimeline.mark("content.frame")
                     contentReady = true
                 }
             }
-            // A launch the system showed no splash for never calls the exit listener, so the
-            // hand-off also settles by itself once its fade would have finished.
+            // Nothing reports the splash gone (there is no exit listener), so the launch counts as
+            // settled a moment after the first screen is ready: the system's own fade is over by then.
             LaunchedEffect(contentReady) {
                 if (contentReady && !launchSettled) {
-                    delay(ForgeMotion.nominalDuration(LAUNCH_HAND_OFF_MS) + 150L)
+                    delay(LAUNCH_SETTLED_FALLBACK_MS)
                     launchSettled = true
                 }
             }

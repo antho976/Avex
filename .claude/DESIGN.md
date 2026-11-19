@@ -251,7 +251,7 @@ Decelerate-in / Accelerate-out / Standard / DrawDecelerate (chart reveals). Spri
 - Feel (don't retune casually): bounceClick MediumBouncy/MediumLow; ForgeSwitch position 0.68/900, thumb resize no-bounce/1400 + press-stretch.
 - **Haptics rare** (`forgeHaptic`): set logged, PR/finish, timer ticks — nothing else.
 - **Reduce-motion is global**, not per-feature: entrance cascade, chart draw-ins, confetti, launch intro and press bounce all degrade to a settled still state. Never gate meaning on motion.
-- **Launch**: low-key (2026-10-21), and short (2026-11-18). The system splash shows the app icon the user picked, held until the first screen is laid out AND Home has its first load in (at most 250 ms past layout, 2 s overall), then fades over Fast as it settles a touch smaller. What it uncovers is finished: Home has no entrance of its own on a cold launch and the nav root does not fade in, so nothing is still moving once the splash has gone. No wordmark, mascots or icon-family scenes; Remove animations makes it a cut.
+- **Launch**: low-key (2026-10-21), and a cut (2026-11-18). The system splash shows the app icon the user picked, held until the first screen is laid out AND Home has its first load in (at most 250 ms past layout, 2 s overall), then is left to the system to remove: the app sets no exit animation, so there is no fade or settle of its own, only the platform's brief one. What it uncovers is finished: Home has no entrance of its own on a cold launch and the nav root does not fade in. No wordmark, mascots or icon-family scenes. The splash itself stays: without one the launcher waits for the app's first frame before it starts opening, and the launch is slower.
 
 ## 10. Charts (overview/detail archetypes)
 

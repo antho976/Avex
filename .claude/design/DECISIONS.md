@@ -8,7 +8,7 @@ an entry whenever a rule is added, changed or retired.
 
 ---
 
-## 2026-11-18 — The launch hands off a finished Home, in Fast
+## 2026-11-18 — The launch hands off a finished Home, with no animation of its own
 
 Antho asked for the app to "open almost instantly". Timed on his phone for the first time
 (`docs/perf/BASELINE-2026-11-18.md`), the 2026-10-21 launch let the splash go as soon as the first
@@ -18,14 +18,23 @@ coach row a moment later (which pushed the page down), and was still rising into
 second after the tap.
 
 **Changed (§9, Launch).** The splash now also waits for Home's first load, at most 250 ms past
-layout; measured, it waits about 40 ms. The fade is Fast (150), was Standard (240). Home's own
-cold-launch entrance (rise and fade, 450 ms) and the nav root's fade-in (320 ms) are removed: the
-splash fading away is the entrance, and what it uncovers is finished.
+layout; measured, it waits about 30 ms. Home's own cold-launch entrance (rise and fade, 450 ms) and
+the nav root's fade-in (320 ms) are removed. The hand-off fade went from Standard (240) to Fast
+(150) and then, the same day, away: shown the numbers, Antho said "remove the animation then no
+need for it I want to jump in as fast as possible". The app no longer sets a splash exit animation
+at all, and the icon no longer settles. From the launcher starting to dim, Home is fully shown at
+about 260 ms; it was about 450 originally and about 390 with the Fast fade.
 
-**Not changed.** The splash itself (the picked icon on the app's dark, settling a touch smaller),
-Remove animations making it a cut, every other screen's entrance cascade, and the motion tokens.
-Pushes and tab slides still run on Emphasized (320): measured, they are the whole of what a
-navigation takes, so shortening them is a taste call left to Antho.
+**Three ways of removing it were measured** (`docs/perf/FIXES-2026-11-18.md`). An exit listener
+that removes the splash at once is the only way to have no fade whatever, and reaches a full Home
+about 20 ms sooner, but the system's hand-over of its splash view showed the splash again for one
+frame in 2 launches of 20. Letting the system remove the splash never did, in 18. No splash at all
+(`windowDisablePreview`) is slower by about 130 ms on screen: the launcher then waits for the app's
+first frame before it starts opening.
+
+**Not changed.** Every other screen's entrance cascade, and the motion tokens. Pushes and tab
+slides still run on Emphasized (320): measured, they are the whole of what a navigation takes, so
+shortening them is a taste call left to Antho.
 
 ---
 
